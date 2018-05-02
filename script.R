@@ -11,7 +11,7 @@ dta_file_locations <- dir("raw_data",
 
 tmp <- lapply(dta_file_locations, FUN = read_csv)
 tmp2 <- reduce(.x = tmp, .f = bind_rows)
-
+rm(tmp)
 tmp2 %>% 
   filter(sex != "Both") %>% 
   filter(metric == "Rate") %>% 
@@ -25,6 +25,14 @@ tmp2 %>%
   ggplot(aes(x = year, y = age, fill = log(val))) + 
   geom_tile() + 
   facet_wrap(~sex)
+
+
+# years available by country 
+
+tmp2 %>% 
+  group_by(location) %>% 
+  summarise(min_year = min(year), max_year = max(year), n_year = length(unique(year))) %>% 
+  arrange(desc(n_year))
 
 
 

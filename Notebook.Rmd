@@ -1,0 +1,153 @@
+---
+title: "Gender Inequalities in Health - Learning from the Global Burden of Disease Study"
+output: html_notebook
+---
+
+# Introduction
+
+This will follow the plan given by Vittal Katikireddi
+
+## Background 
+
+(From Vittal) 
+
+> There are large health differences by gender globally. Non-communicable diseases (NCDs) are increasingly important for gender inequalities in health, with their importance varying throughout the life course. 
+
+> The Global Burden of Disease (GBD) study systematically assesses the state of the world’s health. It brings together epidemiological data from numerous sources and creates modelled estimates of cause-specific death rates, risk factors and disability adjusted life years (DALYs). It is now a well-established data source for informing health policy internationally, including shaping policy within countries and international organisations like the World Health Organization. The GBD data now allow comparison of the health burden attributable to different diseases and risk factors by age and gender for all countries worldwide from 1990-2015. 
+
+> To date, there have been no attempts to assess the contribution of different diseases to gender inequalities in health. Previous work by the MRC/CSO Social & Public Health Sciences Unit has demonstrated that alcohol and tobacco consumption are important contributors in high-income countries, but little other research exists in low-income countries or for the contribution of other risk factors.
+
+## Research questions and objectives 
+
+(From Vittal)
+
+> What diseases, risk factors and economic determinants influence health inequalities by gender, across the world?
+
+## Specific research objectives: 
+
+(From Vittal)
+
+1. **RO1**: What is the contribution of different diseases and their underlying risk factors, to health inequalities by gender using the GBD data?
+2. **RO2**: How do trends in NCDs and their risk factors account for changing gender-based health equity?
+2. **RO3**: How do different economic trends and measures impact on gender inequalities in health? 
+
+## Methods 
+
+(From Vittal)
+
+* **Data**: The GBD 1990-2016 data. These allow all-cause health outcomes to be disaggregated by disease type and risk factor. Both disease cantegory and risk factor are mutually exclusive
+* **Outcomes**: Mortality, Years of life lost (YLL), Disability adjusted life years (DALYs)
+* **Analysis**: Absolute and relative gap between males and females in above outcomes will firstly be calculated for all 192 countries in the 2016 GBD data (RO1).
+    * The proportion of outcomes attribted to a) different diseases; and b) different risk factors will then be calcualted, and their contribution to the absolute and relative game in male-female outcomes determined
+* Analyses will be stratified by age (using standard groupings: under 5, 5-14 years, 15-49 years, 50-69 years, 70+ years).
+* The process will be repeated for all years for which GBD data are available **(RO2)**
+* To investivate the role of economic and social determinants of gender inequalities in health **(RO3)**, country-level economic and social data will be retrieved from various sources (including, e.g. macro-economic indicators from the world bank, and the gender inequality index from the UK development programme). *Fixed-effects models will be used.*
+
+
+# RO 1: First stages 
+
+The permalink for all locations, years, the specified age groups, causes, is [here](http://ghdx.healthdata.org/gbd-results-tool?params=gbd-api-2016-permalink/b86b9576d3cf80b5e4864472dede0072)
+
+```{r setup}
+library(tidyverse)
+```
+
+
+```{r load_ro1_data}
+
+# First download the files 
+# 1.1 store the links
+
+# url root as follows:
+
+url_root <- "http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-"
+
+# then a number from 1 onwards 
+
+read_csv_directly <- function(url_loc, csv_name){
+  temp <- tempfile()
+  download.file(url_loc, temp)
+  output_csv <- read_csv(unz(temp, csv_name))
+  unlink(temp)
+  return(output_csv)
+}
+
+
+num <- 7
+out_file_base <- "raw_data/ro1/csvs/"
+url_root <- "http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-"
+while(1){
+  this_url <- paste0(url_root, num, ".zip")
+  this_csv_name <- paste0("IHME-GBD_2016_DATA-13785177-", num, ".csv")
+  this_csv_file <- try(read_csv_directly(this_url, this_csv_name), silent = TRUE)
+  
+  cat("file number: ", num)
+  
+  print(head(this_csv_file))
+  
+  if(class(this_csv_file) == "try-error")
+    break()
+
+  
+  write_csv(
+    this_csv_file,
+    paste0(out_file_base, num, ".csv")        
+  )
+  num <- num + 1    
+}
+
+  
+
+urls <- c(
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-1.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-2.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-3.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-4.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-5.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-6.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-7.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-8.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-9.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-10.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-11.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-12.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-13.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-14.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-15.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-16.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-17.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-18.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-19.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-20.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-21.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-22.zip",
+"http://s3.healthdata.org/gbd-api-2016-production/1378517769c519e775ba860b1cc102d0_files/IHME-GBD_2016_DATA-13785177-23.zip"
+)
+
+#1.2 download zip files 
+
+tmp_df <- data_frame(url = urls)
+tmp_df <- tmp_df %>% mutate(outnum = 1:length(urls))
+
+#dir.create(path = "raw_data/ro1/zipped", recursive = T)
+walk2(.x = tmp_df$url, .y = tmp_df$outnum, function(.x, .y) {download.file(url = .x, destfile = paste0("raw_data/ro1/zipped/", .y, ".zip"))})
+
+# Next: unzip each of the files 
+
+retrieve_files <- paste0("IHME-GBD_2016_DATA-13785177-", tmp_df$outnum, ".csv")
+
+this_csv <- read_csv(unz("raw_data/ro1/zipped/1.zip", retrieve_files[1]))
+
+# To read the files directly with only temporary downloading 
+
+
+
+tmp_df %>% 
+  mutate(retrieve_file = paste0("IHME-GBD_2016_DATA-13785177-", outnum, ".csv")) %>% 
+  mutate(dta = map2_df(.x = .$url, .y = .$retrieve_file, read_csv_directly)) -> tmp2
+
+
+```
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
