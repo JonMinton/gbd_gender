@@ -42,9 +42,9 @@ all_unique_metrics
 
 
 ## To start with, use only broad wealth groups as locs
-
-write_csv(data_frame(raw_locs = all_unique_locs), path = "data/ro1/all_locs.csv")
-
+# 
+# write_csv(data_frame(raw_locs = all_unique_locs), path = "data/ro1/all_locs.csv")
+# 
 
 # SDI locs ----------------------------------------------------------------
 
@@ -76,4 +76,11 @@ extract_only_sdi <- function(input_file){
 df_loc_lookup %>% 
   mutate(subset_of_file = map(files, extract_only_sdi)) -> df_loc_sdi_subset
 
-write_csv(x = df_loc_sdi_subset, path = "data/ro1/sdi_subset.csv")
+# now to turn subset_of_file into data_frame 
+
+sdi_df <- bind_rows(df_loc_sdi_subset$subset_of_file)
+
+write_csv(x = sdi_df, path = "data/ro1/sdi_subset.csv")
+
+
+
