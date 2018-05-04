@@ -32,17 +32,8 @@ order_age_sdi <- function(x, age_var, location_var){
 
 }
 
-# Test examples 
-# sdi_dta %>% order_age_sdi(age_var = age_name, location_var = location_name)
-# 
-# sdi_dta %>% 
-#   rename(age = age_name) %>% 
-#   rename(sdi = location_name) %>% 
-#   order_age_sdi(age_var = age, location_var = sdi)
 
-# This finally works! 
-
-# Function for adding consisten aesthetics to comparisons between SDI groups
+# Function for adding consistent aesthetics to comparisons between SDI groups
 
 sdi_scaling <- function(){
   list(
@@ -79,10 +70,6 @@ sdi_deaths %>%
   geom_hline(yintercept = 1.0) -> gg_allcause_rel
 
 
-# This looks good. Need to select appropriate size 
-
-# now to do the same with absolute
-
 sdi_deaths %>% 
   ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
   facet_wrap(~age, nrow = 1) + 
@@ -95,6 +82,165 @@ sdi_deaths %>%
   
 
 png("figures/ro1/all_cause_sdi_rel_abs.png", height = 20, width = 20, units = "cm", res = 300)
+gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2) 
+dev.off()
+
+# DALYs 
+
+sdi_dta %>% 
+  rename(age = age_name, sdi = location_name) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  filter(cause_name == "All causes") %>% 
+  select(measure = measure_name, sdi, sex = sex_name, age, year, val) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) %>% 
+  filter(measure == "DALYs (Disability-Adjusted Life Years)") -> sdi_dalys
+
+
+sdi_dalys %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Relative DALYs", subtitle = "All causes", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.8, 2.8, by = 0.1)) +
+  geom_hline(yintercept = 1.0) -> gg_allcause_rel
+
+
+sdi_dalys %>% 
+  ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Absolute DALY differences", subtitle = "All causes", caption = "Source: GBD",
+       y = "Absolute rate", x = "Year") +
+  sdi_scaling() + 
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(breaks = seq(-10000, 45000, by = 2000), labels = scales::comma) -> gg_allcause_abs
+
+
+png("figures/ro1/dalys_all_cause_sdi_rel_abs.png", height = 20, width = 20, units = "cm", res = 300)
+gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2) 
+dev.off()
+
+
+# YLLs 
+
+sdi_dta %>% 
+  rename(age = age_name, sdi = location_name) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  filter(cause_name == "All causes") %>% 
+  select(measure = measure_name, sdi, sex = sex_name, age, year, val) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) %>% 
+  filter(measure == "YLLs (Years of Life Lost)") -> sdi_ylls
+
+
+sdi_ylls %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Relative YLLs", subtitle = "All causes", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.8, 2.8, by = 0.1)) +
+  geom_hline(yintercept = 1.0) -> gg_allcause_rel
+
+
+sdi_ylls %>% 
+  ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Absolute YLL differences", subtitle = "All causes", caption = "Source: GBD",
+       y = "Absolute rate", x = "Year") +
+  sdi_scaling() + 
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(breaks = seq(-10000, 40000, by = 2000), labels = scales::comma) -> gg_allcause_abs
+
+
+png("figures/ro1/ylls_all_cause_sdi_rel_abs.png", height = 20, width = 20, units = "cm", res = 300)
+gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2) 
+dev.off()
+
+
+# DALYs - NCDs
+
+sdi_dta %>% 
+  rename(age = age_name, sdi = location_name) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  select(measure = measure_name, sdi, sex = sex_name, age, year, val) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) %>% 
+  filter(measure == "DALYs (Disability-Adjusted Life Years)") -> sdi_dalys
+
+
+sdi_dalys %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Relative DALYs", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.8, 2.0, by = 0.1)) +
+  geom_hline(yintercept = 1.0) -> gg_allcause_rel
+
+
+sdi_dalys %>% 
+  ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Absolute DALY differences", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Absolute rate", x = "Year") +
+  sdi_scaling() + 
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(breaks = seq(-10000, 30000, by = 2000), labels = scales::comma) -> gg_allcause_abs
+
+
+png("figures/ro1/dalys_NCDs_sdi_rel_abs.png", height = 20, width = 20, units = "cm", res = 300)
+gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2) 
+dev.off()
+
+
+# YLLs 
+
+sdi_dta %>% 
+  rename(age = age_name, sdi = location_name) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  select(measure = measure_name, sdi, sex = sex_name, age, year, val) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) %>% 
+  filter(measure == "YLLs (Years of Life Lost)") -> sdi_ylls
+
+
+sdi_ylls %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Relative YLLs", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.9, 2.0, by = 0.1)) +
+  geom_hline(yintercept = 1.0) -> gg_allcause_rel
+
+
+sdi_ylls %>% 
+  ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Absolute YLL differences", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Absolute rate", x = "Year") +
+  sdi_scaling() + 
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(breaks = seq(-10000, 30000, by = 2000), labels = scales::comma) -> gg_allcause_abs
+
+
+png("figures/ro1/ylls_ncds_sdi_rel_abs.png", height = 20, width = 20, units = "cm", res = 300)
 gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2) 
 dev.off()
 
