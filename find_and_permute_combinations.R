@@ -80,7 +80,7 @@ df_loc_lookup %>%
 
 sdi_df <- bind_rows(df_loc_sdi_subset$subset_of_file)
 
-write_csv(x = sdi_df, path = "data/ro1/sdi_subset.csv")
+write_csv(x = sdi_df, path = "data/ro1/big/sdi_subset.csv")
 
 
 
