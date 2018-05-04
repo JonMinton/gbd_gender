@@ -1,6 +1,7 @@
+rm(list = ls())
 require(tidyverse)
 
-sdi_dta <- read_csv("data/ro1/sdi_subset.csv")
+sdi_dta <- read_csv("data/ro1/big/sdi_subset.csv")
 
 sdi_dta
 
@@ -41,6 +42,7 @@ order_age_sdi <- function(x, age_var, location_var){
 
 # This finally works! 
 
+# Function for adding consisten aesthetics to comparisons between SDI groups
 
 sdi_scaling <- function(){
   list(
@@ -51,9 +53,6 @@ sdi_scaling <- function(){
 }
 
 # to start. let's 
-
-
-
 # 1) make age_name ordered 
 # 2) filter on cause_name == "all causes")
 # 3) calc relative and absolute 
@@ -68,6 +67,7 @@ sdi_dta %>%
   select(-Female, -Male) %>% 
   filter(measure == "Deaths") -> sdi_deaths
 
+
 sdi_deaths %>% 
   ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
   facet_wrap(~age, nrow = 1) + 
@@ -77,17 +77,6 @@ sdi_deaths %>%
   sdi_scaling() + 
   scale_y_continuous(breaks = seq(0.8, 2.8, by = 0.1)) +
   geom_hline(yintercept = 1.0) -> gg_allcause_rel
-
-sdi_deaths %>% 
-  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
-  facet_wrap(~age, nrow = 1) + 
-  geom_line() +
-  labs(title = "Relative Death Rates", subtitle = "All causes", caption = "Source: GBD",
-       y = "Relative rate", x = "Year") +
-  sdi_scaling() +
-  scale_y_continuous(breaks = seq(0.8, 2.8, by = 0.1)) +
-  geom_hline(yintercept = 1.0) 
-
 
 
 # This looks good. Need to select appropriate size 
@@ -115,7 +104,7 @@ sdi_dta %>%
   rename(age = age_name, sdi = location_name) %>% 
   order_age_sdi(age_var = age, location_var = sdi) %>% 
   filter(cause_name == "All causes") %>% 
-  select(measure = measure_name, sdi = location_name, sex = sex_name, age = age_name, year, val) %>% 
+  select(measure = measure_name, sdi, sex = sex_name, age, year, val) %>% 
   spread(sex, val) %>% 
   mutate(rel = Male / Female, abs = Male - Female) %>% 
   select(-Female, -Male) %>% 
@@ -258,6 +247,99 @@ gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2)
 dev.off()
 
 
+# NCDs, incidence and prevalence
+
+# Incidence
+
+sdi_dta %>% 
+  rename(age = age_name, sdi = location_name) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  select(measure = measure_name, sdi, sex = sex_name, age, year, val) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) %>% 
+  filter(measure == "Incidence") -> sdi_ncd_incidence
+
+
+sdi_ncd_incidence %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Relative Incidence", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.8, 2, by = 0.1)) +
+  geom_hline(yintercept = 1.0) -> gg_allcause_rel
+
+# This shows the higher morbidity for females 
+# May need to think about how to label rel < 1 (1/x ?)
+
+
+
+# now to do the same with absolute
+
+sdi_ncd_incidence %>% 
+  ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Absolute Incidence", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Absolute rate", x = "Year") +
+  sdi_scaling() + 
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(breaks = seq(-65000, 25000, by = 5000), labels = scales::comma) -> gg_allcause_abs
+
+
+png("figures/ro1/ncd_sdi_rel_abs_incidence.png", height = 20, width = 20, units = "cm", res = 300)
+gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2)
+dev.off()
+
+
+# Prevalence
+
+sdi_dta %>% 
+  rename(age = age_name, sdi = location_name) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  select(measure = measure_name, sdi, sex = sex_name, age, year, val) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) %>% 
+  filter(measure == "Prevalence") -> sdi_ncd_prevalence
+
+
+sdi_ncd_prevalence %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Relative Prevalence", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.8, 1, by = 0.01)) +
+  geom_hline(yintercept = 1.0) -> gg_allcause_rel
+
+# This shows the higher morbidity for females 
+# May need to think about how to label rel < 1 (1/x ?)
+
+
+
+# now to do the same with absolute
+
+sdi_ncd_incidence %>% 
+  ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_wrap(~age, nrow = 1) + 
+  geom_line() +
+  labs(title = "Absolute Prevalence", subtitle = "NCDs", caption = "Source: GBD",
+       y = "Absolute rate", x = "Year") +
+  sdi_scaling() + 
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(breaks = seq(-65000, 25000, by = 5000), labels = scales::comma) -> gg_allcause_abs
+
+
+png("figures/ro1/ncd_sdi_rel_abs_prevalence.png", height = 20, width = 20, units = "cm", res = 300)
+gridExtra::grid.arrange(gg_allcause_rel, gg_allcause_abs, nrow = 2)
+dev.off()
+
 # Want to know
 
 
@@ -276,14 +358,27 @@ sdi_dta %>%
     )
   ) %>% 
   spread(cause, rate) %>% 
-  mutate(prop_total = NCD / Total) %>% 
+  mutate(prop_total = NCD / Total) -> tmp 
+
+tmp %>% 
   ggplot(aes(x  = year, y = prop_total, group = sdi, linetype = sdi, size = sdi, colour = sdi)) + 
   geom_line() + 
   sdi_scaling() + 
   facet_grid(sex ~ age) + 
-  scale_y_continuous(limits = c(0, 1)) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) + 
   labs(title = "Proportion of Deaths that are NCDs", x = "Year", y = "Proportion", caption = "Source: GBD")
 
+ggsave("figures/ro1/prop_deaths_ncds.png", height = 20, width = 20, dpi = 300, units = "cm")
+
+# swap facets 
+
+tmp %>% 
+  ggplot(aes(x = year, y = prop_total, group = sex, linetype = sex)) + 
+  geom_line() + 
+  facet_grid(sdi ~ age) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1)) + 
+  labs(title = "Proportion of Deaths that are NCDs", x = "Year", y = "Proportion", caption = "Source: GBD")
+ggsave("figures/ro1/prop_deaths_ncds_diff_facet.png", height = 20, width = 20, dpi = 300, units = "cm")
 
 # Gender Ratio of proportions 
 
@@ -312,8 +407,9 @@ sdi_dta %>%
   facet_wrap( ~ age, nrow = 1) + 
   scale_y_continuous(limits = c(0.7, 1.3), breaks = seq(0.6, 1.4, by = 0.02)) + 
   geom_hline(yintercept = 1) + 
-  labs(title = "Ratio of Proportion of Deaths that are NCDs", x = "Year", y = "Ratio of proportions", caption = "Source: GBD")
-
+  labs(title = "Gender Ratio of Proportion of Deaths that are NCDs", 
+       subtitle = "Male proportion NCDs over Female proportion NCDs", x = "Year", y = "Ratio of proportions", caption = "Source: GBD")
+ggsave("figures/ro1/gender_ratio_proportion_ncds.png", height = 12, width = 20, units = "cm", dpi = 300)
 
 # Abs diff in proportions 
 sdi_dta %>% 
