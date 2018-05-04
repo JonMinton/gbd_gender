@@ -36,3 +36,4 @@ vignettes/*.pdf
 # Raw Data
 raw_data/*
 .Rproj.user
+data/ro1/big/*
