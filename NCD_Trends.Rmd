@@ -1,0 +1,62 @@
+---
+title: "Leading Cause of NCD by gender, SDI and age group"
+output: html_notebook
+---
+
+# Introduction 
+
+This document will explore the following: 
+
+1. Proportion of deaths that are NCDs
+2. Top three NCDs 
+3. Proportion of all NCD deaths due to these top three 
+4. Differences by gender, SDI, age group 
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r load_data}
+rm(list = ls())
+
+library(tidyverse) 
+
+dta <- read_csv("data/ro1/big/sdi_subset.csv")
+# want to link cause_ids to hierarchical classification 
+
+library(readxl)
+cause_lookup <- read_excel("raw_data/IHME_GBD_2016_CODEBOOK/IHME_GBD_2016_CAUSE_HIERARCHY_Y2018M04D26.XLSX")
+# 294 - all causes 
+# 409 - NCDs 
+
+```
+
+
+```{r graph01}
+cause_lookup %>% 
+  filter(parent_id == 409) %>% 
+  select(cause_id, cause_name, cause_outline) %>% 
+  inner_join(dta) %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(measure_name == "Deaths") %>% 
+  mutate(location_name = factor(location_name, ordered = T,
+              levels = c("Low SDI", "Low-middle SDI", 
+                         "Middle SDI", "High-middle SDI", "High SDI")
+              )
+  ) %>% 
+  mutate(age_name = factor(age_name, ordered = T,
+              levels = c("Under 5", "5-14 years", "15-49 years",
+                         "50-69 years", "70+ years")
+              )
+  ) %>% 
+  ggplot(aes(x = year, y = val, group = paste(cause_name, sex_name), linetype = sex_name, colour = cause_name)) + 
+  geom_line() + 
+  scale_y_log10() + 
+  facet_grid(location_name ~ age_name) + 
+  labs(title = "NCD Mortality Rates by cause", 
+       subtitle = "disaggregated by age and SDI", 
+      y = "Log mortality rate", 
+      x = "Year",
+      caption = "Source: GBD")
+
+
+```
