@@ -1,0 +1,83 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Further notes 
+
+* From Vittal
+
+Really good to see this progress. 
+
+OK, here's a suggestion for the structure of the paper:
+
+* Figure 1: Relative and absolute gaps in (a) life expectancy and (b) HALYs, stratified by SDI groups
+* Figure 2: (a) Relative and (b) absolute gaps in all cause mortality, stratified by SDI and age groups (i.e. what you've already done) 
+* Figure 3: (a) Relative and (b) absolute gaps in DALYs, stratified by SDI and age groups (i.e. what you've already done)
+* Figure 4: Decomposition of (a) absolute gaps and (b) relative gaps in life expectancy by risk factors (i.e. behavioural and other), stratified by SDI groups
+* Figure 5: Decomposition of (a) absolute gaps and (b) relative gaps in HALYs by risk factors (i.e. behavioural and other), stratified by SDI groups
+
+* Table 1: Fixed-effects regression models of the association between social indicators and (a) life expectancy and (b) HALYs
+
+
+Exposures would be: 
+
+* GDP per capita  https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD
+UN HDR Gender Inequality Index (GII): http://hdr.undp.org/en/content/gender-inequality-index-gii
+* World Bank Health expenditure per capita (also get info on health expenditure as % of GDP)
+* World Income Inequality Database  https://www.wider.unu.edu/database/world-income-inequality-database-wiid34  Unfortunately, this would require a little processing to create a time series that only includes one observation per country-year. There is advice on how to do this. See what you think - if v time-consuming, we could drop. 
+
+It may be worthwhile looking at additional exposures. I've tried to focus on data which cover a large number of countries and across a long time series (so we do not lose too many country-years in the analysis). I'd suggest doing a fixed-effects analysis where we cluster by country. 
+
+Appendix: Repeat Figs 2 and 3 decomposed by risk factors. Repeat Figs 1, 4 and 5 stratified by continent. Repeat Figs 1, 4 and 5 for each individual country within a large table for selected years i.e. 1990 and most recent available year. 
+
+I'd probably avoid decomposing by disease because the GBD papers that are coming out this year are beginning to do that a bit (I think based on my suggestion). What do you think? Please do disagree if you have other thoughts. 
+
+Does the above make sense? It's quite possible it doesn't - if so, let's meet to discuss. I could do Mon 21st 1530 at SPHSU or Fri 25th (not 14-1500) venue TBC. 
+
+It probably would be sensible to have most/all of Figs 1-5 drafted and then we can circulate to the broader group. I wouldn't bother doing the Appendix and Table just now, but prepping the exposure data in the meantime may be worthwhile. 
+
+Cheers.
+
+Vittal
+
+
+New permalink: 
+http://ghdx.healthdata.org/gbd-results-tool?params=gbd-api-2016-permalink/49f19f6b2e1fafca509aeeea1adda399
+
+[This file](./download_ro2_csv_files_directly.R) contains the code for downloading the zip files directly by url. 
+
+To start let's load and bind the two files together
+```{r}
+library(tidyverse)
+dta_01 <- read_csv("raw_data/ro2/csvs/1.csv")
+dta_02 <- read_csv("raw_data/ro2/csvs/2.csv")
+dta <- bind_rows(dta_01, dta_02)
+rm(dta_01, dta_02)
+
+dta
+```
+
+Let's do some sense-checking exploratory analyses 
+
+* All cause mortality rate by rei
+
+```{r}
+dta %>% 
+  select(sex = sex_name, age = age_name, risk_factor = rei_name, cause = cause_name, sdi = location_name, measure = measure_name, metric = metric_name, year = year, val) %>% 
+  select(cause, age, year, sex, sdi, measure, metric, risk_factor, val) %>% 
+  filter(cause == "All causes") %>% 
+  filter(age == "All Ages") %>% 
+  filter(metric == "Rate") %>% 
+  filter(measure == "Deaths") %>% 
+  select(-cause, -age, -metric, -measure) %>% 
+  mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% 
+  ggplot(aes(colour = risk_factor, fill = risk_factor, x = year, y = val)) + 
+  geom_area(position = 'stack') + 
+  facet_grid(sdi ~ sex)
+  
+ggsave("figures/risk_factor_facets.png", width = 60, height = 60, units = "cm", dpi = 150)
+
+```
+
+Note : may want to redo query with all countries not just SDI groups 
