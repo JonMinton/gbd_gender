@@ -19,11 +19,14 @@ read_csv_directly <- function(url_loc, csv_name){
   return(output_csv)
 }
 
-# http://s3.healthdata.org/gbd-api-2016-production/66feac847c306c945792205c72d12904_files/IHME-GBD_2016_DATA-66feac84-1.zip
+
+# http://ghdx.healthdata.org/gbd-results-tool?params=gbd-api-2016-permalink/bd2083c498a4b2a3bd628e8d4d886d99
+
 
 num <- 1
 out_file_base <- "raw_data/ro2/csvs/"
-url_root <- "http://s3.healthdata.org/gbd-api-2016-production/66feac847c306c945792205c72d12904_files/IHME-GBD_2016_DATA-66feac84-"
+url_root <- "http://s3.healthdata.org/gbd-api-2016-production/49fc21f9fe89ce5686dfeccdc713d00d_files/IHME-GBD_2016_DATA-49fc21f9-"
+
 
 files_already_downloaded <- list.files(path = "raw_data/ro2/csvs/")
 
@@ -37,7 +40,7 @@ while(1){
   }
   
   this_url <- paste0(url_root, num, ".zip")
-  this_csv_name <- paste0("IHME-GBD_2016_DATA-66feac84-", num, ".csv")
+  this_csv_name <- paste0("IHME-GBD_2016_DATA-49fc21f9-", num, ".csv")
   this_csv_file <- try(read_csv_directly(this_url, this_csv_name), silent = TRUE)
   
   

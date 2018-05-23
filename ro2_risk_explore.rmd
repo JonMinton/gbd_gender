@@ -1,6 +1,8 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
 
 # Further notes 
@@ -11,25 +13,25 @@ Really good to see this progress.
 
 OK, here's a suggestion for the structure of the paper:
 
-* Figure 1: Relative and absolute gaps in (a) life expectancy and (b) HALYs, stratified by SDI groups
-* Figure 2: (a) Relative and (b) absolute gaps in all cause mortality, stratified by SDI and age groups (i.e. what you've already done) 
-* Figure 3: (a) Relative and (b) absolute gaps in DALYs, stratified by SDI and age groups (i.e. what you've already done)
-* Figure 4: Decomposition of (a) absolute gaps and (b) relative gaps in life expectancy by risk factors (i.e. behavioural and other), stratified by SDI groups
-* Figure 5: Decomposition of (a) absolute gaps and (b) relative gaps in HALYs by risk factors (i.e. behavioural and other), stratified by SDI groups
+* *Figure 1*: Relative and absolute gaps in (a) life expectancy and (b) HALYs, stratified by SDI groups
+* *Figure 2*: (a) Relative and (b) absolute gaps in all cause mortality, stratified by SDI and age groups (i.e. what you've already done) 
+* *Figure 3*: (a) Relative and (b) absolute gaps in DALYs, stratified by SDI and age groups (i.e. what you've already done)
+* *Figure 4*: Decomposition of (a) absolute gaps and (b) relative gaps in life expectancy by risk factors (i.e. behavioural and other), stratified by SDI groups
+* *Figure 5*: Decomposition of (a) absolute gaps and (b) relative gaps in HALYs by risk factors (i.e. behavioural and other), stratified by SDI groups
 
-* Table 1: Fixed-effects regression models of the association between social indicators and (a) life expectancy and (b) HALYs
+* *Table 1*: Fixed-effects regression models of the association between social indicators and (a) life expectancy and (b) HALYs
 
 
 Exposures would be: 
 
-* GDP per capita  https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD
-UN HDR Gender Inequality Index (GII): http://hdr.undp.org/en/content/gender-inequality-index-gii
+* [GDP per capita](https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD)  
+* [UN HDR Gender Inequality Index (GII)](http://hdr.undp.org/en/content/gender-inequality-index-gii): 
 * World Bank Health expenditure per capita (also get info on health expenditure as % of GDP)
-* World Income Inequality Database  https://www.wider.unu.edu/database/world-income-inequality-database-wiid34  Unfortunately, this would require a little processing to create a time series that only includes one observation per country-year. There is advice on how to do this. See what you think - if v time-consuming, we could drop. 
+* [World Income Inequality Database](https://www.wider.unu.edu/database/world-income-inequality-database-wiid34) Unfortunately, this would require a little processing to create a time series that only includes one observation per country-year. There is advice on how to do this. See what you think - if v time-consuming, we could drop. 
 
 It may be worthwhile looking at additional exposures. I've tried to focus on data which cover a large number of countries and across a long time series (so we do not lose too many country-years in the analysis). I'd suggest doing a fixed-effects analysis where we cluster by country. 
 
-Appendix: Repeat Figs 2 and 3 decomposed by risk factors. Repeat Figs 1, 4 and 5 stratified by continent. Repeat Figs 1, 4 and 5 for each individual country within a large table for selected years i.e. 1990 and most recent available year. 
+*Appendix*: Repeat Figs 2 and 3 decomposed by risk factors. Repeat Figs 1, 4 and 5 stratified by continent. Repeat Figs 1, 4 and 5 for each individual country within a large table for selected years i.e. 1990 and most recent available year. 
 
 I'd probably avoid decomposing by disease because the GBD papers that are coming out this year are beginning to do that a bit (I think based on my suggestion). What do you think? Please do disagree if you have other thoughts. 
 
@@ -48,12 +50,13 @@ http://ghdx.healthdata.org/gbd-results-tool?params=gbd-api-2016-permalink/49f19f
 [This file](./download_ro2_csv_files_directly.R) contains the code for downloading the zip files directly by url. 
 
 To start let's load and bind the two files together
-```{r}
+```{r, echo = F, warning = F, message = F}
 library(tidyverse)
 dta_01 <- read_csv("raw_data/ro2/csvs/1.csv")
 dta_02 <- read_csv("raw_data/ro2/csvs/2.csv")
-dta <- bind_rows(dta_01, dta_02)
-rm(dta_01, dta_02)
+dta_03 <- read_csv("raw_data/ro2/csvs/3.csv")
+dta <- bind_rows(dta_01, dta_02) %>% bind_rows(dta_03)
+rm(dta_01, dta_02, dta_03)
 
 dta
 ```
@@ -74,10 +77,459 @@ dta %>%
   mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% 
   ggplot(aes(colour = risk_factor, fill = risk_factor, x = year, y = val)) + 
   geom_area(position = 'stack') + 
-  facet_grid(sdi ~ sex)
+  facet_grid(sdi ~ sex) + 
+  guides(fill = FALSE, colour = FALSE)
   
 ggsave("figures/risk_factor_facets.png", width = 60, height = 60, units = "cm", dpi = 150)
 
 ```
 
-Note : may want to redo query with all countries not just SDI groups 
+I've redone the query to include all countries as well as separate SDI groups. 
+
+I now want to learn more about the main risk disease categories and hierarchies. Do I have this info in a lookup already? 
+
+Yes. Thse are in REI hierarchy 
+
+```{r}
+rei_codebook <- readxl::read_excel("raw_data/IHME_GBD_2016_CODEBOOK/IHME_GBD_2016_REI_HIERARCHY_Y2018M04D26.XLSX")
+```
+
+
+```{r}
+# Let's keep all level 1
+
+rei_codebook %>% 
+  right_join(dta) %>% 
+  filter(level == 1) %>% 
+  select(sex = sex_name, age = age_name, risk_factor = rei_name, cause = cause_name, sdi = location_name, measure = measure_name, metric = metric_name, year = year, val) %>% 
+  select(cause, age, year, sex, sdi, measure, metric, risk_factor, val) %>% 
+  filter(cause == "All causes") %>% 
+  filter(age == "All Ages") %>% 
+  filter(metric == "Rate") %>% 
+  filter(measure == "Deaths") %>% 
+  select(-cause, -age, -metric, -measure) %>% 
+  mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% 
+  ggplot(aes(colour = risk_factor, fill = risk_factor, x = year, y = val)) + 
+  geom_area(position = 'stack') + 
+  facet_grid(sex ~ sdi)  + 
+  labs(x = "Year", y = "Death Rate per 100 000", title = "Death rates by risk factor",
+       subtitle = "Faceted by Gender and SDI", fill = "Risk factor", colour = "Risk factor",
+       caption = "Source: GBD") +
+  theme(legend.position = "bottom")
+
+```
+
+Now let's take the coding scheme/approach used previously to show trends by SDI over time.
+We start by porting over some convenience functions I made: 
+
+```{r}
+order_age_sdi <- function(x, age_var, location_var){
+  
+  # enquo finds the value associated with the var name and makes sure that 
+  # when !! is used, the value is used as the name
+  
+  # quo_name used on LHS before special asignment operator := 
+  # for naming columns 
+  
+  age_var <- enquo(age_var)
+  location_var <- enquo(location_var)
+  
+  x %>% 
+    mutate(!!quo_name(age_var) := factor(
+    !!age_var, ordered = T, 
+    levels = c("Under 5", "5-14 years", "15-49 years", "50-69 years", "70+ years")
+    )
+  ) %>% 
+    mutate(!!quo_name(location_var) := factor(
+      !!location_var, ordered = T,
+      levels = c("Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")
+    )
+  ) -> out
+  out
+
+}
+
+
+# Function for adding consistent aesthetics to comparisons between SDI groups
+
+sdi_scaling <- function(){
+  list(
+    scale_colour_manual("SDI", values = c("red", "red", "black", "blue", "blue")), 
+    scale_linetype_manual("SDI", values = c("solid", "dashed", "solid", "dashed", "solid")), 
+    scale_size_manual("SDI", values = c(1.5, 1, 1, 1, 1.5)) 
+  )
+}
+```
+
+```{r}
+# to start. let's 
+# 1) make age_name ordered 
+# 2) filter on cause_name == "all causes")
+# 3) calc relative and absolute 
+rei_codebook %>% 
+  right_join(dta) %>% 
+  filter(level == 1) %>% 
+  select(sex = sex_name, age = age_name, risk_factor = rei_name, cause = cause_name, sdi = location_name, measure = measure_name, metric = metric_name, year = year, val) %>% 
+  select(cause, age, year, sex, sdi, measure, metric, risk_factor, val) %>% 
+  filter(cause == "All causes") %>% 
+  filter(age != "All Ages") %>% 
+  filter(metric == "Rate") %>% 
+  filter(measure == "Deaths") %>% 
+  filter(sdi != "Global") %>% 
+  select(-cause,  -metric, -measure) %>% 
+  mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) -> sdi_death_rates
+```
+
+Here's the graph of relative risk, all causes
+
+```{r}
+sdi_death_rates %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_grid(risk_factor ~ age) + 
+  geom_line() +
+  labs(title = "Relative Death Rates by risk factor", subtitle = "All causes", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.8, 4, by = 0.2)) +
+  geom_hline(yintercept = 1.0) 
+```
+
+And here's the same for NCDs only
+
+```{r}
+rei_codebook %>% 
+  right_join(dta) %>% 
+  filter(level == 1) %>% 
+  select(sex = sex_name, age = age_name, risk_factor = rei_name, cause = cause_name, sdi = location_name, measure = measure_name, metric = metric_name, year = year, val) %>% 
+  select(cause, age, year, sex, sdi, measure, metric, risk_factor, val) %>% 
+  filter(cause == "Non-communicable diseases") %>% 
+  filter(age != "All Ages") %>% 
+  filter(metric == "Rate") %>% 
+  filter(measure == "Deaths") %>% 
+  filter(sdi != "Global") %>% 
+  select(-cause,  -metric, -measure) %>% 
+  mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female, abs = Male - Female) %>% 
+  select(-Female, -Male) %>% 
+  ggplot(aes(x = year, y = rel, colour = sdi, linetype = sdi, size = sdi)) + 
+  facet_grid(risk_factor ~ age) + 
+  geom_line() +
+  labs(title = "Relative Death Rates by risk factor", subtitle = "Non-communicable Diseases", caption = "Source: GBD",
+       y = "Relative rate", x = "Year") +
+  sdi_scaling() + 
+  scale_y_continuous(breaks = seq(0.8, 4, by = 0.2)) +
+  geom_hline(yintercept = 1.0) 
+
+
+```
+
+*To do: Work out why values missing for age 5-14 years for Behavioural and Mental/Occupational. And Under 5 for Mental/Occupational - this is likely due to these death/risk factor combinations being very rare and so estimates unreliable.*
+
+*Suggestion: Start comparisons after age 14 years*
+
+
+# Reminder of suggested main figures:
+
+
+* *Figure 1*: Relative and absolute gaps in (a) life expectancy and (b) HALYs, stratified by SDI groups
+* *Figure 4*: Decomposition of (a) absolute gaps and (b) relative gaps in life expectancy by risk factors (i.e. behavioural and other), stratified by SDI groups
+* *Figure 5*: Decomposition of (a) absolute gaps and (b) relative gaps in HALYs by risk factors (i.e. behavioural and other), stratified by SDI groups
+
+
+Let's start with figure 1, including all necessary downloading etc
+
+## Figure 1
+
+To start need to download e0 by SDI, gender, year, and death status (all, NCD)
+
+This will require another query. Having wrapped up the data grabber into a function this should now be a bit easier. 
+
+
+First e0.
+
+```{r, eval = FALSE}
+url <- "http://s3.healthdata.org/gbd-api-2016-production/0960785dcee27c60760f6ac02d2025d7_files/IHME-GBD_2016_DATA-0960785d-1.zip"
+url_before <- "http://s3.healthdata.org/gbd-api-2016-production/0960785dcee27c60760f6ac02d2025d7_files"
+url_after <- "IHME-GBD_2016_DATA-0960785d-"
+source("download_completed_request.R")
+download_completed_request(
+  url_before_filenm = url_before, 
+  url_filenm_root = url_after, 
+  outdir = "raw_data/e0", 
+  flush = FALSE
+  )
+
+```
+
+Now to download from local dir 
+
+```{r}
+
+dta_e0 <- read_csv("raw_data/e0/1.csv")
+
+dta_e0
+```
+
+
+To visualise, values 
+
+```{r}
+dta_e0 %>% 
+  filter(location_name != "Global") %>% filter(age_name == "All Ages") %>% 
+  filter(measure_name == "Life expectancy") %>% 
+  select(sdi = location_name, year, sex = sex_name, e0 = val) %>% 
+  mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% ggplot(aes(x = year, y = e0, colour = sex, linetype = sex)) + 
+  geom_line() + 
+  facet_wrap(~sdi, nrow = 1)
+  
+```
+
+Now relative differences 
+
+```{r}
+dta_e0 %>% 
+  filter(location_name != "Global") %>% filter(age_name == "All Ages") %>% 
+  filter(measure_name == "Life expectancy") %>% 
+  select(sdi = location_name, year, sex = sex_name, e0 = val) %>% 
+  mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% 
+  spread(sex, e0) %>% 
+  mutate(rel = Male / Female) %>% 
+  mutate(perc_gap = (1 - rel) * 100) %>% 
+  ggplot(aes(x = year, y = perc_gap, colour = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() +
+  sdi_scaling() +
+  scale_y_continuous(breaks = seq(0, 12, by = 1), limits = c(0, 12)) + 
+  labs(title = "Gender gap in life expectancy", 
+       subtitle = "By SDI", 
+       x = "Year", y = "Percentage gap",
+       caption = "Source: GBD")
+
+
+```
+
+Now absolute differences 
+
+```{r}
+dta_e0 %>% 
+  filter(location_name != "Global") %>% filter(age_name == "All Ages") %>% 
+  filter(measure_name == "Life expectancy") %>% 
+  select(sdi = location_name, year, sex = sex_name, e0 = val) %>% 
+  mutate(sdi = forcats::fct_relevel(sdi, "Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI")) %>% 
+  spread(sex, e0) %>% 
+  mutate(abs = Female - Male) %>% 
+  ggplot(aes(x = year, y = abs, colour = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() +
+  sdi_scaling() +
+  scale_y_continuous(breaks = seq(0, 10, by = 1), limits = c(0, 10)) + 
+  labs(title = "Gender gap in life expectancy", 
+       subtitle = "By SDI", 
+       x = "Year", y = "Gap in years",
+       caption = "Source: GBD")
+
+
+```
+
+Now to so the same with HALE
+
+* Tried to query this - "Your query returned no data"
+
+Will try DALYs instead 
+First download the data 
+
+```{r, eval = FALSE}
+url <- "http://s3.healthdata.org/gbd-api-2016-production/1ad84f3d429a369aeb4b401311b852d0_files/IHME-GBD_2016_DATA-1ad84f3d-1.zip"
+url_before <- "http://s3.healthdata.org/gbd-api-2016-production/1ad84f3d429a369aeb4b401311b852d0_files"
+url_after <- "IHME-GBD_2016_DATA-1ad84f3d-"
+source("download_completed_request.R")
+download_completed_request(
+  url_before_filenm = url_before, 
+  url_filenm_root = url_after, 
+  outdir = "raw_data/dalys", 
+  flush = FALSE
+  )
+
+```
+
+
+DALYs by gender, age group, SDI - for all cause and NCD only 
+
+First load the data 
+
+```{r}
+dta_daly <- read_csv("raw_data/dalys/1.csv")
+
+```
+First all cause 
+
+```{r}
+dta_daly %>% 
+  select(-measure_id, -measure_name) %>% 
+  rename(sdi = location_name) %>% 
+  select(-location_id, -sex_id, -age_id) %>% 
+  select(sex = sex_name, sdi, age = age_name, year, cause = cause_name, val) %>% 
+  filter(cause == "All causes") %>% 
+  filter(age != "All Ages") %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  ggplot(aes(x = year, y = val, colour = sdi, group = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() + 
+  facet_grid(sex ~ age) + 
+  sdi_scaling() +
+  labs(title = "DALY rate by age and SDI",
+       subtitle = "DALY rate per 100 000",
+       x = "Year", y = "DALY rate per 100 000",
+       caption = "Source: GBD")
+
+
+```
+
+All cause - relative difference by gender
+
+```{r}
+
+dta_daly %>% 
+    select(-measure_id, -measure_name) %>% 
+    rename(sdi = location_name) %>% 
+    select(-location_id, -sex_id, -age_id) %>% 
+    select(sex = sex_name, sdi, age = age_name, year, cause = cause_name, val) %>% 
+    filter(cause == "All causes") %>% 
+    filter(age != "All Ages") %>% 
+    order_age_sdi(age_var = age, location_var = sdi) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female) %>% 
+  ggplot(aes(x = year, y = rel, group = sdi, col = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() + 
+  facet_wrap(~age, nrow = 1) +
+  sdi_scaling() +
+  labs(title = "Relative DALY rate by age and SDI - All Causes",
+       subtitle = "Male Rate / Female Rate",
+       x = "Year", y = "DALY ratio",
+       caption = "Source: GBD") + 
+  scale_y_continuous(breaks = seq(0.9, 1.7, by = .1), limits = c(0.9, 1.7))  +
+  geom_hline(yintercept = 1)
+
+```
+
+Now absolute - all cause 
+
+```{r}
+
+dta_daly %>% 
+    select(-measure_id, -measure_name) %>% 
+    rename(sdi = location_name) %>% 
+    select(-location_id, -sex_id, -age_id) %>% 
+    select(sex = sex_name, sdi, age = age_name, year, cause = cause_name, val) %>% 
+    filter(cause == "All causes") %>% 
+    filter(age != "All Ages") %>% 
+    order_age_sdi(age_var = age, location_var = sdi) %>% 
+  spread(sex, val) %>% 
+  mutate(abs = Male - Female) %>% 
+  ggplot(aes(x = year, y = abs, group = sdi, col = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() + 
+  facet_wrap(~age, nrow = 1) +
+  sdi_scaling() +
+  labs(title = "Absolute DALY difference by age and SDI - All Causes",
+       subtitle = "Male Rate - Female Rate (Both per 100 000)",
+       x = "Year", y = "DALY Difference",
+       caption = "Source: GBD") + 
+  scale_y_continuous(breaks = seq(-10000, 35000, by = 5000), limits = c(-10000, 35000))  +
+  geom_hline(yintercept = 0)
+
+```
+
+
+## Now NCD only 
+
+
+```{r}
+dta_daly %>% 
+  select(-measure_id, -measure_name) %>% 
+  rename(sdi = location_name) %>% 
+  select(-location_id, -sex_id, -age_id) %>% 
+  select(sex = sex_name, sdi, age = age_name, year, cause = cause_name, val) %>% 
+  filter(cause == "Non-communicable diseases") %>% 
+  filter(age != "All Ages") %>% 
+  order_age_sdi(age_var = age, location_var = sdi) %>% 
+  ggplot(aes(x = year, y = val, colour = sdi, group = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() + 
+  facet_grid(sex ~ age) + 
+  sdi_scaling() +
+  labs(title = "DALY rate by age and SDI - NCDs only",
+       subtitle = "DALY rate per 100 000",
+       x = "Year", y = "DALY rate per 100 000",
+       caption = "Source: GBD")
+
+
+```
+
+All cause - relative difference by gender
+
+```{r}
+
+dta_daly %>% 
+    select(-measure_id, -measure_name) %>% 
+    rename(sdi = location_name) %>% 
+    select(-location_id, -sex_id, -age_id) %>% 
+    select(sex = sex_name, sdi, age = age_name, year, cause = cause_name, val) %>% 
+    filter(cause == "Non-communicable diseases") %>% 
+    filter(age != "All Ages") %>% 
+    order_age_sdi(age_var = age, location_var = sdi) %>% 
+  spread(sex, val) %>% 
+  mutate(rel = Male / Female) %>% 
+  ggplot(aes(x = year, y = rel, group = sdi, col = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() + 
+  facet_wrap(~age, nrow = 1) +
+  sdi_scaling() +
+  labs(title = "Relative DALY rate by age and SDI - NCDs",
+       subtitle = "Male Rate / Female Rate",
+       x = "Year", y = "DALY ratio",
+       caption = "Source: GBD") + 
+  scale_y_continuous(breaks = seq(0.9, 1.7, by = .1), limits = c(0.9, 1.7))  +
+  geom_hline(yintercept = 1)
+
+```
+
+Now absolute - all cause 
+
+```{r}
+
+dta_daly %>% 
+    select(-measure_id, -measure_name) %>% 
+    rename(sdi = location_name) %>% 
+    select(-location_id, -sex_id, -age_id) %>% 
+    select(sex = sex_name, sdi, age = age_name, year, cause = cause_name, val) %>% 
+    filter(cause == "Non-communicable diseases") %>% 
+    filter(age != "All Ages") %>% 
+    order_age_sdi(age_var = age, location_var = sdi) %>% 
+  spread(sex, val) %>% 
+  mutate(abs = Male - Female) %>% 
+  ggplot(aes(x = year, y = abs, group = sdi, col = sdi, linetype = sdi, size = sdi)) + 
+  geom_line() + 
+  facet_wrap(~age, nrow = 1) +
+  sdi_scaling() +
+  labs(title = "Absolute DALY difference by age and SDI - NCDs",
+       subtitle = "Male Rate - Female Rate (Both per 100 000)",
+       x = "Year", y = "DALY Difference",
+       caption = "Source: GBD") + 
+  scale_y_continuous(breaks = seq(-10000, 35000, by = 5000), limits = c(-10000, 35000))  +
+  geom_hline(yintercept = 0)
+
+```
+
+
+# Returning to fig 4 and 5
+
+* *Figure 4*: Decomposition of (a) absolute gaps and (b) relative gaps in life expectancy by risk factors (i.e. behavioural and other), stratified by SDI groups
+* *Figure 5*: Decomposition of (a) absolute gaps and (b) relative gaps in HALYs by risk factors (i.e. behavioural and other), stratified by SDI groups
+
+Re Fig 4: I think decomposition of e0 into risk factors is perhaps more of a complex actuarial task requiring more age-disaggregated data than it may first appear. *Suggestion: Speak to Frank Popham for further advice* - However - might want to look at YLLs, and differences in YLLs by risk factor. 
+
+Re Fig 5: So far more data appears to be available by DALYs than HALE. 
+
+*Key Suggestion*: **Run GBD Results Tool with preferred queries set. Save permalink and send to me (with description). I'll be able to download the files directly from this link. (n.b. data split into multiple files are fine too. The script I've written will just iterate through these files.)**
+
