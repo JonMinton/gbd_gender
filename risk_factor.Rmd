@@ -1,0 +1,93 @@
+---
+title: "Risk Factors"
+output: html_notebook
+---
+
+# Intro
+
+This doc will explore mortality and DALYs by risk factors 
+
+First to load the pre requisite packages and script for downloading data. 
+
+```{r}
+library(tidyverse)
+
+source("download_completed_request.R")
+```
+
+Next I will download the data from the request. (Only has to be done once so now set not to evaluate (run)).
+
+
+```{r, eval = T}
+
+
+url_body <- "http://s3.healthdata.org/gbd-api-2016-production/6790a3f2d5948a86929939c83525f81e_files"
+url_head <- "IHME-GBD_2016_DATA-6790a3f2-"
+outdir <- "raw_data/risk"
+
+download_completed_request(url_body, url_head, outdir, flush = T)
+
+
+```
+
+The files can now be loaded and joined locally as follows 
+
+```{r}
+dta <- read_csv("raw_data/risk/1.csv") %>% bind_rows(read_csv("raw_data/risk/2.csv"))
+
+dta
+glimpse(dta)
+
+```
+
+The `_id` suffix columns can be used to join to the lookup tables. In this case for risk (by rei_id)
+
+```{r}
+lookup <- readxl::read_excel("raw_data/IHME_GBD_2016_CODEBOOK/IHME_GBD_2016_REI_HIERARCHY_Y2018M04D26.XLSX")
+lookup
+glimpse(lookup)
+
+```
+
+In this example I'll join then filter only level 1 categories in the rei hierarchy 
+
+```{r}
+dta %>% 
+  left_join(lookup) %>% 
+  filter(level == 1) -> dta_lvl1
+```
+
+Now to start exploring: age-standardised, global, deaths, by lvl 1 risk factor and gender 
+
+```{r}
+
+dta_lvl1 %>%
+  filter(measure_name == "Deaths") %>% 
+  filter(location_name == "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "All causes") %>% 
+  select(year, sex = sex_name, risk_factor = rei_name, death_rate = val) %>% 
+  ggplot(aes(x = year, y = death_rate, linetype = sex, colour = sex)) + 
+  facet_wrap(~ risk_factor) +
+  geom_line()
+
+```
+
+Now to do the same by SDI
+
+```{r}
+
+dta_lvl1 %>%
+  filter(measure_name == "Deaths") %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "All causes") %>% 
+  select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, death_rate = val) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI"), ordered = T)) %>% 
+  ggplot(aes(x = year, y = death_rate, linetype = sex, colour = sex)) + 
+  facet_grid(sdi ~ risk_factor) +
+  geom_line()
+
+```

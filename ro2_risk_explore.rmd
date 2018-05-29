@@ -49,9 +49,13 @@ http://ghdx.healthdata.org/gbd-results-tool?params=gbd-api-2016-permalink/49f19f
 
 [This file](./download_ro2_csv_files_directly.R) contains the code for downloading the zip files directly by url. 
 
-To start let's load and bind the two files together
+To start let's load and bind the files together
 ```{r, echo = F, warning = F, message = F}
 library(tidyverse)
+
+```
+
+```{r, echo = F, warning = F, message = F}
 dta_01 <- read_csv("raw_data/ro2/csvs/1.csv")
 dta_02 <- read_csv("raw_data/ro2/csvs/2.csv")
 dta_03 <- read_csv("raw_data/ro2/csvs/3.csv")
@@ -520,6 +524,19 @@ dta_daly %>%
   geom_hline(yintercept = 0)
 
 ```
+
+
+# Decomposition figures 
+
+Want the following 
+
+* Age standardised (then age-stratified)
+* All cause mortality rates 
+* DALY rates 
+* By gender 
+* By level 2 risk factors 
+* By SDI group
+
 
 
 # Returning to fig 4 and 5
