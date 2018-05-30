@@ -1,6 +1,8 @@
 ---
 title: "Risk Factors"
-output: html_notebook
+output:
+  html_notebook: default
+  word_document: default
 ---
 
 # Intro
@@ -18,7 +20,7 @@ source("download_completed_request.R")
 Next I will download the data from the request. (Only has to be done once so now set not to evaluate (run)).
 
 
-```{r, eval = T}
+```{r, eval = F, comment= F, echo = F}
 
 
 url_body <- "http://s3.healthdata.org/gbd-api-2016-production/6790a3f2d5948a86929939c83525f81e_files"
@@ -85,9 +87,347 @@ dta_lvl1 %>%
   filter(metric_name == "Rate") %>% 
   filter(cause_name == "All causes") %>% 
   select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, death_rate = val) %>% 
-  mutate(sdi = factor(sdi, levels = c("Low SDI", "Low-middle SDI", "Middle SDI", "High-middle SDI", "High SDI"), ordered = T)) %>% 
+  mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
   ggplot(aes(x = year, y = death_rate, linetype = sex, colour = sex)) + 
-  facet_grid(sdi ~ risk_factor) +
+  facet_grid(risk_factor ~ sdi) +
   geom_line()
 
 ```
+
+And now let's see what this implies for relative inequalities
+
+
+```{r}
+
+dta_lvl1 %>%
+    filter(measure_name == "Deaths") %>% 
+    filter(location_name != "Global") %>% 
+    filter(age_name == "Age-standardized") %>% 
+    filter(metric_name == "Rate") %>% 
+    filter(cause_name == "All causes") %>% 
+    select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, death_rate = val) %>% 
+    mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+    mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% spread(sex, death_rate) %>% mutate(ratio = Male / Female) %>% 
+  ggplot(aes(x = year, y = ratio, colour = risk_factor)) + 
+  geom_line() + 
+  facet_grid(.  ~ sdi) + 
+  geom_hline(yintercept = 1)
+
+```
+
+# DALY decomposition 
+
+Let's look at the contribution of different risk factors to DALY difference
+
+
+```{r}
+dta_lvl1 %>% 
+  filter(measure_name == "DALYs (Disability-Adjusted Life Years)") %>% 
+  filter(location_name != "Global") %>% 
+  filter(cause_name == "All causes") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, daly_rate = val) %>% 
+  mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
+  ggplot(aes(x = year, y = daly_rate, fill = risk_factor), colour = "black") + 
+  geom_area() + 
+  facet_grid(sdi~sex)
+
+```
+
+
+Now proportion of all DALYs attributable to each risk factor by year and SDI
+```{r}
+dta_lvl1 %>% 
+  filter(measure_name == "DALYs (Disability-Adjusted Life Years)") %>% 
+  filter(location_name != "Global") %>% 
+  filter(cause_name == "All causes") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, daly_rate = val) %>% 
+  mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
+  group_by(year, sex, sdi) %>% 
+  mutate(total = sum(daly_rate)) %>% 
+  mutate(proportion_total = daly_rate / total) %>% 
+  ungroup() %>%
+  ggplot(aes(x = year, y = proportion_total, fill = risk_factor), colour = "black") + 
+  geom_area() + 
+  facet_grid(sdi~sex)
+
+```
+
+# Prop total deaths attributable to diff risk factors
+
+
+Now proportion of total deaths 
+```{r}
+by_factor <- dta_lvl1 %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(-measure_name, -measure_id) %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "All causes") %>% 
+  select(year, sex = sex_name, sdi = location_name, rei = rei_name, rate = val) %>%   mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T))
+
+overall <- dta %>% 
+  filter(rei_name == "All risk factors") %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(-measure_name, -measure_id) %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "All causes") %>% 
+  select(year, sex = sex_name, sdi = location_name, rei = rei_name, rate = val) %>%   mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T))
+
+joined <- bind_rows(by_factor, overall)
+rm(by_factor, overall)
+
+```
+
+Unfortunately it seems 'all risk factors' is not the same as 'total', i.e. the absolute differences in age-standardised death rates from each of the three level 1 risk factors do not add up to the 'all risk factors' absolute difference
+
+
+```{r}
+joined %>% 
+  spread(sex, rate) %>% 
+  mutate(abs_diff = Male - Female) %>% 
+  group_by(year, sdi) %>% 
+  mutate(perc_of_abs_diff = 100 * abs_diff / abs_diff[rei=="All risk factors"]) %>% 
+  summarise(discrepancy = sum(perc_of_abs_diff[rei != "All risk factors"]) - 100) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = year, y = discrepancy, colour = sdi)) + 
+  geom_line() 
+
+```
+
+So, the risk factors might not be mutually exclusive and exhaustive. Let's take middle SDI in 2000 as an example
+
+```{r}
+joined %>% 
+  filter(sdi == "Middle") %>% 
+  filter(year == 2000) %>% 
+  spread(sex, rate) %>% 
+  mutate(abs_diff = Male - Female) %>% 
+  group_by(year, sdi) %>% 
+  mutate(perc_of_abs_diff = 100 * abs_diff / abs_diff[rei=="All risk factors"]) 
+
+
+
+```
+So, the total of the three bottom rows adds up to around 160, when I might expect them to add to 100. A simple decomposition assumption doesn't seem to apply when using the 'all risk factors' designation as total. 
+
+To try to account for this let's look at a different dataset, with:
+
+* Age standardised ages
+* All cause
+* Mortality rates 
+* By SDI
+
+Let's try to grab this data with a new query 
+
+The query link is [here](http://ghdx.healthdata.org/gbd-results-tool/result/c9bf1a5197bf46a966c1467c3103e8a9).
+
+
+```{r, eval = F}
+
+url_body <- "http://s3.healthdata.org/gbd-api-2016-production/c9bf1a5197bf46a966c1467c3103e8a9_files"
+url_head <- "IHME-GBD_2016_DATA-c9bf1a51-"
+outdir <- "raw_data/rate_all_cause"
+
+download_completed_request(url_body, url_head, outdir, flush = T)
+```
+
+
+And now to load this file 
+
+```{r}
+
+dta_total <- read_csv("raw_data/rate_all_cause/1.csv")
+```
+
+
+```{r}
+
+by_factor <- dta_lvl1 %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(-measure_name, -measure_id) %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "All causes") %>% 
+  select(year, sex = sex_name, sdi = location_name, rei = rei_name, rate = val) %>%   mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T))
+
+overall <- dta_total %>% filter(location != "Global") %>% mutate(rei = "total") %>% mutate(sdi = stringr::str_replace(location, " SDI", "")) %>% 
+    mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% select(year, sex, sdi, rei, rate = val)
+
+
+```
+
+
+Let's see if the totals add up this time. The three level 1 risk factors are shown as stacked areas, and the total is shown as a black line... 
+
+
+```{r}
+by_factor %>% 
+  ggplot(aes(x = year, y = rate, fill = rei)) + 
+  geom_area() + 
+  facet_grid(sex ~ sdi) +
+  geom_line(aes(x = year, y = rate), inherit.aes = F, data = overall)
+
+```
+
+
+So, there is still discrepancy, which seems to be largest for low SDI, and smallest for high-middle SDI, but this might be decomposable subject to some assumptions.
+
+Let's now compare with previous attempt at an 'overall' estimate (based on 'all risk factors'). In the following this is added as a black dashed line. We might expect the dashed and solid lines to be the same, but are they? 
+
+
+```{r}
+overall2 <- dta %>% 
+  filter(rei_name == "All risk factors") %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(-measure_name, -measure_id) %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "All causes") %>% 
+  select(year, sex = sex_name, sdi = location_name, rei = rei_name, rate = val) %>%   mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T))
+
+by_factor %>% 
+  ggplot(aes(x = year, y = rate, fill = rei)) + 
+  geom_area() + 
+  facet_grid(sex ~ sdi) +
+  geom_line(aes(x = year, y = rate), inherit.aes = F, data = overall) +
+  geom_line(aes(x = year, y = rate), inherit.aes = F, data = overall2, linetype = "dashed")
+
+
+```
+
+So, there are clear differences between age-standardised rates drawn from all causes (solid line), and age-standardised rates drawm from all risk factors (dashed lines), with the latter below the former. Again, this raises questions about how to perform a decomposition into risk factors, the effect of age-standardization, and so on. 
+
+# Level 1 internal decomposition 
+
+Let's not use level 0 for decomposing level 1 etc, and instead just produce estimates of total by summing up level 1 risks. Then, do the same for level 2. 
+
+```{r}
+
+contributions <- by_factor %>% 
+  inner_join(
+    by_factor %>% 
+      group_by(year, sex, sdi) %>% 
+      summarise(total_rate = sum(rate)) %>% 
+      ungroup()
+    ) %>% 
+  group_by(year, sdi) %>% 
+  mutate(abs_sex_diff = total_rate[sex == "Male"][1] - total_rate[sex == "Female"][1]) %>% 
+  group_by(year, sdi, rei) %>% 
+  mutate(rei_abs_sex_diff = rate[sex == "Male"] - rate[sex == "Female"]) %>% 
+  ungroup() %>% 
+  mutate(contribution = 100 * rei_abs_sex_diff / abs_sex_diff)
+
+```
+
+Now to plot the contribution over time by SDI
+
+```{r}
+contributions %>% 
+  select(year, sex, sdi, rei, contribution) %>% 
+  distinct() %>% 
+  ggplot(aes(x = year, y= contribution, colour = rei)) + 
+  geom_line() + 
+  facet_wrap(~sdi)
+
+```
+
+
+Let's think again about how to present this in the case of three risk factors, such that it could be scaled up to more factors 
+
+```{r}
+by_factor %>% 
+  spread(sex, rate) %>% 
+  mutate(diff_abs = Male - Female) %>% 
+  group_by(year, sdi) %>%
+  mutate(diff_cumulative = cumsum(diff_abs)) -> cumulative_contributions
+
+
+```
+
+
+Now to plot for two years, 1990 and 2010
+
+```{r}
+
+# use geom_segement
+
+cumulative_contributions %>% 
+    filter(year %in% c(1990, 2010)) %>% 
+    mutate(start_pos = diff_cumulative - diff_abs) %>% 
+    mutate(is_increasing = diff_cumulative > start_pos) %>% 
+  group_by(year, sdi) %>% 
+  mutate(max_cumulative = diff_cumulative[length(diff_cumulative)]) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = start_pos, xend = diff_cumulative, y = rei, yend = rei, colour = is_increasing)) + 
+  geom_segment( arrow = arrow(length = unit(0.2, "npc"))) + 
+  facet_grid(sdi ~ year) +
+  geom_vline(xintercept = 0) + 
+  geom_vline(aes(xintercept = max_cumulative), linetype = "dashed") + 
+  guides(colour = FALSE) + 
+  labs(x = "Gender difference in rates", y = "Risk factors (level 1)", title = "Contribution of risk factors to gender differences in all-cause mortality rates", subtitle = "Age-standardised rates per 100 000", caption = "Source: GBD")
+
+
+ggsave("figures/contribution_of_level1_riskfactors_death_rate.png", height = 30, width = 30, units = "cm", dpi = 300)
+
+
+```
+
+This seems to work as a visualisation. Let's try to scale up to level 2
+
+```{r}
+by_factor_l2 <- dta %>% 
+  left_join(lookup) %>% 
+  filter(level == 2)  %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(-measure_name, -measure_id) %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "All causes") %>% 
+  select(year, sex = sex_name, sdi = location_name, rei = rei_name, rate = val) %>%   mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) 
+```
+
+
+```{r}
+by_factor_l2 %>% 
+  spread(sex, rate) %>% 
+  mutate(diff_abs = Male - Female) %>% 
+  group_by(year, sdi) %>%
+  mutate(diff_cumulative = cumsum(diff_abs)) %>% 
+    filter(year %in% c(1990, 2010)) %>% 
+    mutate(start_pos = diff_cumulative - diff_abs) %>% 
+    mutate(is_increasing = diff_cumulative > start_pos) %>% 
+  group_by(year, sdi) %>% 
+  mutate(max_cumulative = diff_cumulative[length(diff_cumulative)]) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = start_pos, xend = diff_cumulative, y = rei, yend = rei, colour = is_increasing)) + 
+  geom_segment( arrow = arrow(length = unit(0.05, "npc"))) + 
+  facet_grid(sdi ~ year) +
+  geom_vline(xintercept = 0) + 
+  geom_vline(aes(xintercept = max_cumulative), linetype = "dashed") + 
+  guides(colour = FALSE) + 
+  labs(x = "Gender difference in rates", y = "Risk factors (level 2)", title = "Contribution of risk factors to gender differences in all-cause mortality rates", subtitle = "Age-standardised rates per 100 000", caption = "Source: GBD")
+
+ggsave("figures/contribution_of_level2_riskfactors_death_rate.png", height = 30, width = 30, units = "cm", dpi = 300)
+
+```
+
+This seems to work pretty well though is perhaps at the limit of visual complexity. More time periods etc would likely make this image too busy.
+
