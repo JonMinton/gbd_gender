@@ -1,0 +1,52 @@
+---
+title: "Extracting GDP per capita for countries using World Bank API"
+output: html_notebook
+---
+
+# Aim 
+
+The aim of this would be to extract the following as an exposure:
+
+Exposures would be: 
+
+* [GDP per capita](https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD)   
+
+There's an API/ R Web package described [here](https://cran.r-project.org/web/packages/wbstats/vignettes/Using_the_wbstats_package.html)
+
+Let's try to use it to get this information 
+
+```{r}
+library(wbstats)
+
+gdp_percap_data <- wb(indicator= "NY.GDP.PCAP.PP.CD")
+
+```
+
+now let's see what we've got 
+
+```{r}
+require(tidyverse)
+
+
+gdp_percap_data %>% 
+  ggplot(aes(x = date, y = value, group = country)) + 
+  geom_line(alpha = 0.4) +
+  scale_y_log10() +
+  geom_line(aes(x = date, y = value), colour = "red", size = 1.5, data = gdp_percap_data %>% filter(iso2c == "GB")) 
+
+
+```
+
+
+Now density in 1990, 2000, 2010
+
+```{r}
+gdp_percap_data %>% 
+  filter(date %in% c(1990, 2000, 2010)) %>% 
+  ggplot(aes(x = value, group = date, fill = date)) + 
+  geom_density(alpha = 0.4) + 
+  scale_x_log10() + 
+  labs(x = "GDP per capita", y = "proportion of countries")
+
+```
+
