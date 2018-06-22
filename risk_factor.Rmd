@@ -72,7 +72,15 @@ dta_lvl1 %>%
   select(year, sex = sex_name, risk_factor = rei_name, death_rate = val) %>% 
   ggplot(aes(x = year, y = death_rate, linetype = sex, colour = sex)) + 
   facet_wrap(~ risk_factor) +
-  geom_line()
+  geom_line() + 
+  labs(
+    x = "Year", y = "Age standardised death rate (per 100 000)",
+    title = "Age-standardised death rate by level 1 risk factor and gender",
+    subtitle = "Rates per 100 000",
+    caption = "Source: GBD"
+       )
+
+ggsave("figures/level1_riskfactor_agestandardised.png", width = 20, height = 15, units = "cm", dpi = 300)
 
 ```
 
@@ -91,7 +99,45 @@ dta_lvl1 %>%
   mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
   ggplot(aes(x = year, y = death_rate, linetype = sex, colour = sex)) + 
   facet_grid(risk_factor ~ sdi) +
-  geom_line()
+  geom_line() + 
+  labs(
+    x = "Year", y = "Death rate",
+    title = "Death rate by risk factor, SDI, and gender",
+    subtitle = "Age standardised rates per 100 000",
+    caption = "Source: GBD"
+    
+  )
+
+ggsave("figures/riskfactor_sdi_gender.png", height = 20, width = 30, units = "cm", dpi = 300)
+
+```
+
+
+Now to do the same by SDI
+
+```{r}
+
+dta_lvl1 %>%
+  filter(measure_name == "Deaths") %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, death_rate = val) %>% 
+  mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
+  ggplot(aes(x = year, y = death_rate, linetype = sex, colour = sex)) + 
+  facet_grid(risk_factor ~ sdi) +
+  geom_line() + 
+  labs(
+    x = "Year", y = "Death rate",
+    title = "Death rate by risk factor, SDI, and gender. NCDs",
+    subtitle = "Age standardised rates per 100 000",
+    caption = "Source: GBD"
+    
+  )
+
+ggsave("figures/riskfactor_sdi_gender_NCDs.png", height = 20, width = 30, units = "cm", dpi = 300)
 
 ```
 
@@ -111,9 +157,46 @@ dta_lvl1 %>%
     mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% spread(sex, death_rate) %>% mutate(ratio = Male / Female) %>% 
   ggplot(aes(x = year, y = ratio, colour = risk_factor)) + 
   geom_line() + 
-  facet_grid(.  ~ sdi) + 
-  geom_hline(yintercept = 1)
+  facet_grid(. ~ sdi) + 
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Year",
+    y = "Ratio: Male / Female",
+    title = "Ratio of male:female age standardised mortality rates (all causes) by risk factor and SDI",
+    subtitle = "Age standardised rates / 100 000",
+    caption = "Source: GBD"
+  )
 
+ggsave("figures/ratio_rates_allcause.png", height = 20, width = 20, units = "cm", dpi = 300)
+```
+
+As above, but NCDs only
+
+
+```{r}
+
+dta_lvl1 %>%
+    filter(measure_name == "Deaths") %>% 
+    filter(location_name != "Global") %>% 
+    filter(age_name == "Age-standardized") %>% 
+    filter(metric_name == "Rate") %>% 
+    filter(cause_name == "Non-communicable diseases") %>% 
+    select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, death_rate = val) %>% 
+    mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+    mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% spread(sex, death_rate) %>% mutate(ratio = Male / Female) %>% 
+  ggplot(aes(x = year, y = ratio, colour = risk_factor)) + 
+  geom_line() + 
+  facet_grid(. ~ sdi) + 
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Year",
+    y = "Ratio: Male / Female",
+    title = "Ratio of male:female age standardised mortality rates (NCDs only) by risk factor and SDI",
+    subtitle = "Age standardised rates / 100 000",
+    caption = "Source: GBD"
+  )
+
+ggsave("figures/ratio_rates_ncds.png", height = 20, width = 20, units = "cm", dpi = 300)
 ```
 
 # DALY decomposition 
@@ -133,8 +216,17 @@ dta_lvl1 %>%
   mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
   ggplot(aes(x = year, y = daly_rate, fill = risk_factor), colour = "black") + 
   geom_area() + 
-  facet_grid(sdi~sex)
+  facet_grid(sdi~sex) + 
+  labs(
+    x = "Year",
+    y = "Sum of DALYs",
+    title = "DALYs by level 1 risk factor, gender and SDI. All causes",
+    subtitle = "Age-standardised age selection",
+    caption = "Source: GBD"
+    
+  )
 
+ggsave("figures/DALYsum_agestandardised_allcauses.png", width = 25, height = 25, units = "cm", dpi = 300)
 ```
 
 
@@ -155,9 +247,82 @@ dta_lvl1 %>%
   ungroup() %>%
   ggplot(aes(x = year, y = proportion_total, fill = risk_factor), colour = "black") + 
   geom_area() + 
-  facet_grid(sdi~sex)
+  facet_grid(sdi~sex) + 
+  labs(
+    x = "Year",
+    y = "Proportion of DALYs",
+    title = "DALYs by level 1 risk factor, gender and SDI. All causes",
+    subtitle = "Age-standardised age selection",
+    caption = "Source: GBD"
+    
+  )
+
+ggsave("figures/DALYprop_agestandardised_allcauses.png", width = 25, height = 25, units = "cm", dpi = 300)
 
 ```
+
+
+
+
+```{r}
+dta_lvl1 %>% 
+  filter(measure_name == "DALYs (Disability-Adjusted Life Years)") %>% 
+  filter(location_name != "Global") %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, daly_rate = val) %>% 
+  mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
+  ggplot(aes(x = year, y = daly_rate, fill = risk_factor), colour = "black") + 
+  geom_area() + 
+  facet_grid(sdi~sex) + 
+  labs(
+    x = "Year",
+    y = "Sum of DALYs",
+    title = "DALYs by level 1 risk factor, gender and SDI. NCDs only",
+    subtitle = "Age-standardised age selection",
+    caption = "Source: GBD"
+    
+  )
+
+ggsave("figures/DALYsum_agestandardised_NCDs.png", width = 25, height = 25, units = "cm", dpi = 300)
+```
+
+
+Now proportion of all DALYs attributable to each risk factor by year and SDI
+```{r}
+dta_lvl1 %>% 
+  filter(measure_name == "DALYs (Disability-Adjusted Life Years)") %>% 
+  filter(location_name != "Global") %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  select(year, sex = sex_name, sdi = location_name, risk_factor = rei_name, daly_rate = val) %>% 
+  mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% 
+  group_by(year, sex, sdi) %>% 
+  mutate(total = sum(daly_rate)) %>% 
+  mutate(proportion_total = daly_rate / total) %>% 
+  ungroup() %>%
+  ggplot(aes(x = year, y = proportion_total, fill = risk_factor), colour = "black") + 
+  geom_area() + 
+  facet_grid(sdi~sex) + 
+  labs(
+    x = "Year",
+    y = "Proportion of DALYs",
+    title = "DALYs by level 1 risk factor, gender and SDI. NCDs only",
+    subtitle = "Age-standardised age selection",
+    caption = "Source: GBD"
+    
+  )
+
+ggsave("figures/DALYprop_agestandardised_NCDs.png", width = 25, height = 25, units = "cm", dpi = 300)
+
+```
+
+
+
 
 # Prop total deaths attributable to diff risk factors
 
@@ -431,3 +596,105 @@ ggsave("figures/contribution_of_level2_riskfactors_death_rate.png", height = 30,
 
 This seems to work pretty well though is perhaps at the limit of visual complexity. More time periods etc would likely make this image too busy.
 
+
+Let's do the above for NCDs only 
+
+
+
+Let's think again about how to present this in the case of three risk factors, such that it could be scaled up to more factors 
+
+```{r}
+
+
+by_factor <- dta_lvl1 %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(-measure_name, -measure_id) %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  select(year, sex = sex_name, sdi = location_name, rei = rei_name, rate = val) %>%   mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T))
+
+overall <- dta_total %>% filter(location != "Global") %>% mutate(rei = "total") %>% mutate(sdi = stringr::str_replace(location, " SDI", "")) %>% 
+    mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) %>% select(year, sex, sdi, rei, rate = val)
+
+
+by_factor %>% 
+  spread(sex, rate) %>% 
+  mutate(diff_abs = Male - Female) %>% 
+  group_by(year, sdi) %>%
+  mutate(diff_cumulative = cumsum(diff_abs)) -> cumulative_contributions
+
+
+```
+
+
+Now to plot for two years, 1990 and 2010
+
+```{r}
+
+# use geom_segement
+
+cumulative_contributions %>% 
+    filter(year %in% c(1990, 2010)) %>% 
+    mutate(start_pos = diff_cumulative - diff_abs) %>% 
+    mutate(is_increasing = diff_cumulative > start_pos) %>% 
+  group_by(year, sdi) %>% 
+  mutate(max_cumulative = diff_cumulative[length(diff_cumulative)]) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = start_pos, xend = diff_cumulative, y = rei, yend = rei, colour = is_increasing)) + 
+  geom_segment( arrow = arrow(length = unit(0.2, "npc"))) + 
+  facet_grid(sdi ~ year) +
+  geom_vline(xintercept = 0) + 
+  geom_vline(aes(xintercept = max_cumulative), linetype = "dashed") + 
+  guides(colour = FALSE) + 
+  labs(x = "Gender difference in rates", y = "Risk factors (level 1)", title = "Contribution of risk factors to gender differences in NCD mortality rates", subtitle = "Age-standardised rates per 100 000", caption = "Source: GBD")
+
+
+ggsave("figures/contribution_of_level1_riskfactors_death_rate_NCDs.png", height = 30, width = 30, units = "cm", dpi = 300)
+
+
+```
+
+This seems to work as a visualisation. Let's try to scale up to level 2
+
+```{r}
+by_factor_l2 <- dta %>% 
+  left_join(lookup) %>% 
+  filter(level == 2)  %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(-measure_name, -measure_id) %>% 
+  filter(location_name != "Global") %>% 
+  filter(age_name == "Age-standardized") %>% 
+  filter(metric_name == "Rate") %>% 
+  filter(cause_name == "Non-communicable diseases") %>% 
+  filter(rei_name != "Unsafe sex") %>% 
+  select(year, sex = sex_name, sdi = location_name, rei = rei_name, rate = val) %>%   mutate(sdi = stringr::str_replace(sdi, " SDI", "")) %>% 
+  mutate(sdi = factor(sdi, levels = c("Low", "Low-middle", "Middle", "High-middle", "High"), ordered = T)) 
+```
+
+
+```{r}
+by_factor_l2 %>% 
+  spread(sex, rate) %>% 
+  mutate(diff_abs = Male - Female) %>% 
+  group_by(year, sdi) %>%
+  mutate(diff_cumulative = cumsum(diff_abs)) %>% 
+    filter(year %in% c(1990, 2010)) %>% 
+    mutate(start_pos = diff_cumulative - diff_abs) %>% 
+    mutate(is_increasing = diff_cumulative > start_pos) %>% 
+  group_by(year, sdi) %>% 
+  mutate(max_cumulative = diff_cumulative[length(diff_cumulative)]) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = start_pos, xend = diff_cumulative, y = rei, yend = rei, colour = is_increasing)) + 
+  geom_segment( arrow = arrow(length = unit(0.05, "npc"))) + 
+  facet_grid(sdi ~ year) +
+  geom_vline(xintercept = 0) + 
+  geom_vline(aes(xintercept = max_cumulative), linetype = "dashed") + 
+  guides(colour = FALSE) + 
+  labs(x = "Gender difference in rates", y = "Risk factors (level 2)", title = "Contribution of risk factors to gender differences in NCD mortality rates", subtitle = "Age-standardised rates per 100 000", caption = "Source: GBD")
+
+ggsave("figures/contribution_of_level2_riskfactors_death_rate_NCDs.png", height = 30, width = 30, units = "cm", dpi = 300)
+
+```

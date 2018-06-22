@@ -1,8 +1,9 @@
 ---
 title: "R Notebook"
 output:
-  html_document: default
+  word_document: default
   html_notebook: default
+  html_document: default
 ---
 
 # Further notes 

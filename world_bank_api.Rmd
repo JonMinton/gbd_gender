@@ -50,3 +50,48 @@ gdp_percap_data %>%
 
 ```
 
+# Other indicators 
+
+I'm looking for variables that may explain gender inequalities in NCDs (and overall)
+
+
+https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD
+
+```{r explore_wb_cachelist}
+require(wbstats)
+require(tidyverse)
+
+str(wb_cachelist, max.level = 1)
+
+gender_statistics_ids <- wb_cachelist$indicators[wb_cachelist$indicators$source == "Gender Statistics", "indicatorID"]
+
+length(gender_statistics_ids)
+```
+
+So, there are 260 indicators listed as 'gender statistics'. The details of these are below
+
+
+```{r get_gender_stats}
+wb_cachelist$indicators %>% 
+  filter(indicatorID %in% c(gender_statistics_ids))
+
+```
+
+
+# Note from Vittal 
+
+See if the indicators from [this website](http://hdr.undp.org/en/composite/GII) are available. 
+
+These are:
+
+* Human Development Index
+* Life expectancy at birth
+* Expected years of schooling
+* Mean years of schooling
+* GNI per capita rank minus HDI rank
+* HDI rank
+
+
+
+
+
