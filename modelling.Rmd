@@ -1,0 +1,113 @@
+---
+title: "Exposure and Fixed-Effects modelling "
+output: html_notebook
+---
+
+# Introduction
+
+This aim of this research is to build a series of models which include the following response variables: 
+
+1. Male age-standardised mortality rates (all-cause)
+2. Female age-standardised mortality rates (all-cause)
+3. Relative difference in all-cause rates (1 / 2)
+4. Absolute difference in all-cause rates (1 - 2) 
+5. Male age-standardised mortality rates (NCDs)
+6. Female age-standardised mortality rates (NCDs)
+7. Relative difference in NCD rates (5 / 6)
+8. Absolute differnece in NCD rates (5 - 6)
+
+This will be done for each country (level 3 in location hierarchy). 
+
+And a series of exposures from the World Bank will be used: 
+
+1. GDP per cap by purchasing power parity 
+2. Male literacy rates 
+3. Female literacy rates 
+4. etc etc 
+
+# Loading GBD data 
+
+I'm trying to make a fresh request but currently the server keeps failing. 
+
+I think I will take the RO1 data and select those rows where the following conditions hold:  
+
+* Age: All Ages 
+* Cause: All causes 
+* Measure_name: Deaths
+* rei_name: All risk factors 
+
+
+```{r}
+
+gbd_locations <- readxl::read_excel("raw_data/IHME_GBD_2016_CODEBOOK/IHME_GBD_2016_GBD_LOCATION_HIERARCHY_Y2018M04D26.XLSX")
+
+gbd_country_ids <- gbd_locations %>% 
+  filter(location_id %in% 1:218) %>% 
+  filter(level == 3) %>% 
+  pull(location_id)
+
+get_rows <- function(DTA){
+  out <- DTA %>% 
+    filter(measure_name == "Deaths") %>% 
+    filter(location_id %in% gbd_country_ids) %>% 
+    filter(age_name == "15-49 years") %>% # Using this until I can get more appropriate data 
+    filter(cause_name == "All causes") %>% 
+    select(location_id, location_name, sex = sex_name, 
+           year, rate = val) 
+  
+  cat("From ", nrow(tmp), " to ", nrow(out), " rows\n")
+  
+  out
+}
+
+DF <- data_frame(
+  file_loc = list.files("raw_data/ro1/csvs/", full.names = T)
+) %>% 
+  mutate(
+    dta = map(file_loc, .f = ~ read_csv(.) %>% get_rows(.))
+  )
+
+```
+
+Now to join all data frames together 
+
+
+```{r}
+dta_risk <- bind_rows(DF$dta)
+
+write_rds(x = dta_risk, path = "data/ro1_subset_country.rds")
+```
+
+
+And now to join this to the world bank measures 
+
+```{r}
+wb_data <- read_rds("data/world_bank/extracted_indicators.RData")
+
+```
+
+
+```{r}
+wb_gbd_joined <- dta_risk %>%
+  mutate(country = location_name) %>% 
+  inner_join(
+    wb_data %>% 
+      mutate(year = as.integer(date)) %>% 
+      select(year, country, indicator_id = indicatorID, indicator, indicator_value = value) 
+  ) 
+
+```
+
+Note: Add GDP per capita from WB
+
+As a first example, let's regress rates on `5.51.01.07.gender` (Gender equality in education)
+
+```{r}
+summary(lm(rate ~ sex + year, data = wb_gbd_joined))
+
+summary(lm(rate ~ sex + year + indicator_value, data = wb_gbd_joined %>% filter(indicator_id == "5.51.01.07.gender")))
+
+```
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).

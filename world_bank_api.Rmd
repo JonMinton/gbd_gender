@@ -16,8 +16,14 @@ There's an API/ R Web package described [here](https://cran.r-project.org/web/pa
 Let's try to use it to get this information 
 
 ```{r}
-library(wbstats)
+require(wbstats)
+require(tidyverse)
+require(readxl)
 
+```
+
+
+```{r}
 gdp_percap_data <- wb(indicator= "NY.GDP.PCAP.PP.CD")
 
 ```
@@ -25,7 +31,6 @@ gdp_percap_data <- wb(indicator= "NY.GDP.PCAP.PP.CD")
 now let's see what we've got 
 
 ```{r}
-require(tidyverse)
 
 
 gdp_percap_data %>% 
@@ -92,6 +97,83 @@ These are:
 * HDI rank
 
 
+# Identify coverage for selected variables 
+
+I selected around 25 variables previously. These are indicated in an Excel workbook.
+
+The aim of this research is to identify the temporal and geographic coverage of each of these variables 
 
 
+First load the data 
+
+
+```{r}
+wb_indicator_selection <- readxl::read_excel("support/all_wb_indicators.xlsx")
+
+indicators <- wb_indicator_selection %>% 
+  filter(`Keep?` == TRUE) %>% 
+  pull(indicatorID)
+
+
+```
+
+Now, for each of these indicators, want to extract 
+
+```{r cache = TRUE}
+selected_indicators <- wb(indicator = indicators) %>% as_tibble()
+
+```
+
+
+This request takes some time to run, so I'll save the result of the query elsewhere once produced
+
+
+```{r}
+
+write_rds(x = selected_indicators, path = "data/world_bank/extracted_indicators.RData")
+
+```
+
+
+
+```{r}
+selected_indicators %>% 
+  group_by(indicatorID, indicator) %>% 
+  summarise(
+    n_countries = length(unique(iso3c)), 
+    n_years = length(unique(date)), 
+    min_year = min(date), max_year = max(date)
+  ) %>% 
+  arrange(desc(n_years))
+
+```
+
+Want to identify countries by 3 digit code, and whether these are consistent with GBD 
+
+We can start by looking at the country hierarchy info from GBD 
+
+
+```{r}
+gbd_locations <- readxl::read_excel("raw_data/IHME_GBD_2016_CODEBOOK/IHME_GBD_2016_GBD_LOCATION_HIERARCHY_Y2018M04D26.XLSX")
+
+gbd_countries <- gbd_locations %>% 
+  filter(location_id %in% 1:218) %>% 
+  filter(level == 3) %>% 
+  pull(location_name)
+```
+
+
+Now to identify if a match in GBD by country name only 
+
+
+```{r}
+selected_indicators %>% 
+  group_by(country) %>% 
+  summarise(min_date = min(date), max_date = max(date), n_years = length(unique(date))) %>% 
+  ungroup() %>% 
+  mutate(country_in_wb = country %in% gbd_countries) %>% 
+  filter(country_in_wb)
+
+
+```
 
