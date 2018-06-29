@@ -27,14 +27,37 @@ And a series of exposures from the World Bank will be used:
 
 # Loading GBD data 
 
-I'm trying to make a fresh request but currently the server keeps failing. 
 
-I think I will take the RO1 data and select those rows where the following conditions hold:  
+- Source is [here](http://s3.healthdata.org/gbd-api-2016-production/3f1a784fe33bf6d9447c7b90e8828c3f_files/IHME-GBD_2016_DATA-3f1a784f-1.zip)
 
-* Age: All Ages 
-* Cause: All causes 
-* Measure_name: Deaths
-* rei_name: All risk factors 
+
+```{r}
+require(tidyverse)
+source("download_completed_request.R")
+```
+
+Will `read_csv_directly` work?
+
+```{r, eval = F}
+asr_dta <- read_csv_directly(
+  url_loc = "http://s3.healthdata.org/gbd-api-2016-production/3f1a784fe33bf6d9447c7b90e8828c3f_files/IHME-GBD_2016_DATA-3f1a784f-1.zip",
+  csv_name = "data/age_standardised/age_standardised.csv")
+
+```
+
+This *will not* work anymore, I think because the zip file contains two files: a csv file, and a citation.txt file. 
+
+* Action: amend read_csv_directly for new behaviour from GHDx.
+
+
+Anyway, the data's now in the right place
+
+```{r}
+asr_data <- read_csv("data/age_standardised/IHME-GBD_2016_DATA-3f1a784f-1.csv")
+glimpse(asr_data)
+```
+
+Now to link this to the hierarchy 
 
 
 ```{r}
@@ -46,38 +69,17 @@ gbd_country_ids <- gbd_locations %>%
   filter(level == 3) %>% 
   pull(location_id)
 
-get_rows <- function(DTA){
-  out <- DTA %>% 
-    filter(measure_name == "Deaths") %>% 
-    filter(location_id %in% gbd_country_ids) %>% 
-    filter(age_name == "15-49 years") %>% # Using this until I can get more appropriate data 
-    filter(cause_name == "All causes") %>% 
-    select(location_id, location_name, sex = sex_name, 
-           year, rate = val) 
-  
-  cat("From ", nrow(tmp), " to ", nrow(out), " rows\n")
-  
-  out
-}
+asr_data %>% 
+  filter(location_id %in% gbd_country_ids) %>% 
+  filter(measure_name == "Deaths") %>% 
+  select(location = location_name, year, sex = sex_name, cause = cause_name, std_mort_rate = val) -> mort_rate_data
 
-DF <- data_frame(
-  file_loc = list.files("raw_data/ro1/csvs/", full.names = T)
-) %>% 
-  mutate(
-    dta = map(file_loc, .f = ~ read_csv(.) %>% get_rows(.))
-  )
+asr_data %>% 
+  filter(location_id %in% gbd_country_ids) %>% 
+  filter(measure_name == "DALYs (Disability-Adjusted Life Years)") %>% 
+  select(location = location_name, year, sex = sex_name, cause = cause_name, std_mort_rate = val) -> daly_rate_data
 
 ```
-
-Now to join all data frames together 
-
-
-```{r}
-dta_risk <- bind_rows(DF$dta)
-
-write_rds(x = dta_risk, path = "data/ro1_subset_country.rds")
-```
-
 
 And now to join this to the world bank measures 
 
@@ -86,10 +88,19 @@ wb_data <- read_rds("data/world_bank/extracted_indicators.RData")
 
 ```
 
+Let's also add GDP per capita to the selection
+
+
+```{r, cache = T}
+gdp_percap_data <- wbstats::wb(indicator= "NY.GDP.PCAP.PP.CD") %>% as_tibble()
+
+wb_data <- bind_rows(wb_data, gdp_percap_data)
+rm(gdp_percap_data)
+```
 
 ```{r}
-wb_gbd_joined <- dta_risk %>%
-  mutate(country = location_name) %>% 
+mort_rate_data_joined <- mort_rate_data %>%
+  mutate(country = location) %>% 
   inner_join(
     wb_data %>% 
       mutate(year = as.integer(date)) %>% 
@@ -98,7 +109,6 @@ wb_gbd_joined <- dta_risk %>%
 
 ```
 
-Note: Add GDP per capita from WB
 
 As a first example, let's regress rates on `5.51.01.07.gender` (Gender equality in education)
 
@@ -108,6 +118,7 @@ summary(lm(rate ~ sex + year, data = wb_gbd_joined))
 summary(lm(rate ~ sex + year + indicator_value, data = wb_gbd_joined %>% filter(indicator_id == "5.51.01.07.gender")))
 
 ```
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+Now on GDP per capita
+
