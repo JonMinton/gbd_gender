@@ -1,6 +1,8 @@
 ---
-title: "Exposure and Fixed-Effects modelling "
-output: html_notebook
+title: 'Exposure and Fixed-Effects modelling '
+output:
+  html_document: default
+  html_notebook: default
 ---
 
 # Introduction
@@ -33,7 +35,7 @@ And a series of exposures from the World Bank will be used:
 
 ```{r}
 require(tidyverse)
-source("download_completed_request.R")
+source("scripts/download_completed_request.R")
 ```
 
 Will `read_csv_directly` work?
@@ -72,22 +74,22 @@ asr_dta %>%
 
 And now to join this to the world bank measures 
 
-```{r}
-wb_data <- read_rds("data/world_bank/extracted_indicators.RData")
-
-```
-
-Let's also add GDP per capita to the selection
-
-
 ```{r, cache = T}
-gdp_percap_data <- wbstats::wb(indicator= "NY.GDP.PCAP.PP.CD") %>% as_tibble()
+wb_data <- read_rds("data/world_bank/extracted_indicators.RData")
+nrow(wb_data)
+
+gdp_percap_data <- wbstats::wb(indicator= "NY.GDP.PCAP.PP.CD") %>% as_tibble() 
+nrow(gdp_percap_data)
 
 wb_data <- bind_rows(wb_data, gdp_percap_data)
 rm(gdp_percap_data)
+nrow(wb_data)
+
 ```
 
-```{r}
+join to mort rate
+
+```{r} 
 mort_rate_data_joined <- mort_rate_data %>%
   mutate(country = location) %>% 
   inner_join(
@@ -98,16 +100,280 @@ mort_rate_data_joined <- mort_rate_data %>%
 
 ```
 
-
-As a first example, let's regress rates on `5.51.01.07.gender` (Gender equality in education)
-
-```{r}
-summary(lm(rate ~ sex + year, data = wb_gbd_joined))
-
-summary(lm(rate ~ sex + year + indicator_value, data = wb_gbd_joined %>% filter(indicator_id == "5.51.01.07.gender")))
+```{r} 
+daly_rate_data_joined <- daly_rate_data %>%
+  mutate(country = location) %>% 
+  inner_join(
+    wb_data %>% 
+      mutate(year = as.integer(date)) %>% 
+      select(year, country, indicator_id = indicatorID, indicator, indicator_value = value) 
+  ) 
 
 ```
 
 
-Now on GDP per capita
+
+Models by gender and indicator
+
+
+
+```{r}
+
+pull_indicator_coeff <- function(x){x %>% filter(term == "indicator_value") %>% pull(estimate) }
+pull_indicator_se <- function(x){x %>% filter(term == "indicator_value") %>% pull(std.error) }
+
+simple_models <- mort_rate_data_joined %>% 
+  filter(cause == "All causes") %>% 
+  select(country, year, sex, std_mort_rate, indicator_id, indicator, indicator_value) %>% 
+  filter(!is.na(indicator_value)) %>% 
+  group_by(indicator_id) %>% 
+  nest() %>% 
+  mutate(male_model = map(
+    data,
+    function(x) {
+      x %>%
+      filter(sex == "Male") %>%
+      lm(std_mort_rate ~ year + indicator_value, data = .) 
+    }
+      )
+    ) %>%
+  mutate(female_model = map(
+    data, 
+    function(x) {
+      x %>% 
+        filter(sex == "Female") %>% 
+        lm(std_mort_rate ~ year + indicator_value, data = .) 
+        }
+      )
+    ) %>% 
+  mutate(
+    male_model_tidy = map(male_model, broom::tidy),
+    female_model_tidy = map(female_model, broom::tidy)     
+  ) %>% 
+  mutate(
+    male_indicator_coeff        = map_dbl(male_model_tidy,   pull_indicator_coeff),
+    female_indicator_coeff      = map_dbl(female_model_tidy, pull_indicator_coeff),
+    male_indicator_se           = map_dbl(male_model_tidy,   pull_indicator_se),
+    female_indicator_se         = map_dbl(female_model_tidy, pull_indicator_se)
+    )
+
+
+
+```
+
+Note: for some of these indicators the log should probably be used 
+
+
+```{r, results = "asis"}
+simple_models %>% 
+  select(indicator_id, male_indicator_coeff:female_indicator_se) %>% 
+  left_join(wb_data %>% select(indicator_id = indicatorID, indicator) %>% distinct) %>%
+  mutate(
+    male_t = male_indicator_coeff / male_indicator_se, 
+    female_t = female_indicator_coeff / female_indicator_se
+    ) %>% 
+  select(indicator_id, indicator, male_t, female_t) %>% 
+  arrange(desc(abs(male_t))) %>%
+  mutate(
+    male_rank = 1 + length(male_t) - rank(abs(male_t)), 
+    female_rank = 1 + length(female_t) - rank(abs(female_t))) %>% 
+  filter(abs(male_t) > 2 | abs(female_t) > 2) %>%
+  mutate(male_t = round(male_t, 2), female_t = round(female_t, 2)) %>% 
+  mutate(diff = male_rank - female_rank) %>% 
+  knitr::kable(caption = "Signal strength of indicators on male and female age-standardised all-cause mortality trends")
+
+```
+
+The above shows the 'signal strength' of the different indicators once year is controlled for. For both genders GDP per capital has the strongest signal, followed by gender parity in primary school enrollment. 
+For males, age-standardised mortality rates are then most strongly predicted by the female urban population (% of total), followed by male urban population as % of total. 
+For females, the third strongest signal is gender parity in primary and secondary school enrollment, followed by gender parity in secondary school (only) enrollment rates.   
+
+# As above, but CVD only
+
+
+```{r, results = "asis"}
+
+
+mort_rate_data_joined %>% 
+  filter(cause == "Non-communicable diseases") %>% 
+  select(country, year, sex, std_mort_rate, indicator_id, indicator, indicator_value) %>% 
+  filter(!is.na(indicator_value)) %>% 
+  group_by(indicator_id) %>% 
+  nest() %>% 
+  mutate(male_model = map(
+    data,
+    function(x) {
+      x %>%
+      filter(sex == "Male") %>%
+      lm(std_mort_rate ~ year + indicator_value, data = .) 
+    }
+      )
+    ) %>%
+  mutate(female_model = map(
+    data, 
+    function(x) {
+      x %>% 
+        filter(sex == "Female") %>% 
+        lm(std_mort_rate ~ year + indicator_value, data = .) 
+        }
+      )
+    ) %>% 
+  mutate(
+    male_model_tidy = map(male_model, broom::tidy),
+    female_model_tidy = map(female_model, broom::tidy)     
+  ) %>% 
+  mutate(
+    male_indicator_coeff        = map_dbl(male_model_tidy,   pull_indicator_coeff),
+    female_indicator_coeff      = map_dbl(female_model_tidy, pull_indicator_coeff),
+    male_indicator_se           = map_dbl(male_model_tidy,   pull_indicator_se),
+    female_indicator_se         = map_dbl(female_model_tidy, pull_indicator_se)
+    ) %>% 
+  select(indicator_id, male_indicator_coeff:female_indicator_se) %>% 
+  left_join(wb_data %>% select(indicator_id = indicatorID, indicator) %>% distinct) %>%
+  mutate(
+    male_t = male_indicator_coeff / male_indicator_se, 
+    female_t = female_indicator_coeff / female_indicator_se
+    ) %>% 
+  select(indicator_id, indicator, male_t, female_t) %>% 
+  arrange(desc(abs(male_t))) %>%
+  mutate(
+    male_rank = 1 + length(male_t) - rank(abs(male_t)), 
+    female_rank = 1 + length(female_t) - rank(abs(female_t))) %>% 
+  filter(abs(male_t) > 2 | abs(female_t) > 2) %>%
+  mutate(male_t = round(male_t, 2), female_t = round(female_t, 2)) %>% 
+  mutate(diff = male_rank - female_rank) %>% 
+  knitr::kable(caption = "Signal strength of indicators on male and female age-standardised NCD mortality trends")
+
+
+
+```
+
+Gender differences in the signal strength of these indicators appear much larger for NCD mortality than all cause mortality. Note also that the direction of effects goes in the opposite direction for some indicators, though only for the Mo Ibrahim index are the effects in opposite directions and the t values > 2. 
+
+The rank importance of access to anti-retroviral drugs is increased, to 2nd and 3rd place after GDP per capita. 
+
+
+# Signal strength, all cause, DALY
+
+Now to look at the equivalent for DALYs 
+
+
+```{r, results = "asis"}
+
+daly_rate_data_joined %>% 
+  filter(cause == "All causes") %>% 
+  select(country, year, sex, std_mort_rate, indicator_id, indicator, indicator_value) %>% 
+  filter(!is.na(indicator_value)) %>% 
+  group_by(indicator_id) %>% 
+  nest() %>% 
+  mutate(male_model = map(
+    data,
+    function(x) {
+      x %>%
+      filter(sex == "Male") %>%
+      lm(std_mort_rate ~ year + indicator_value, data = .) 
+    }
+      )
+    ) %>%
+  mutate(female_model = map(
+    data, 
+    function(x) {
+      x %>% 
+        filter(sex == "Female") %>% 
+        lm(std_mort_rate ~ year + indicator_value, data = .) 
+        }
+      )
+    ) %>% 
+  mutate(
+    male_model_tidy = map(male_model, broom::tidy),
+    female_model_tidy = map(female_model, broom::tidy)     
+  ) %>% 
+  mutate(
+    male_indicator_coeff        = map_dbl(male_model_tidy,   pull_indicator_coeff),
+    female_indicator_coeff      = map_dbl(female_model_tidy, pull_indicator_coeff),
+    male_indicator_se           = map_dbl(male_model_tidy,   pull_indicator_se),
+    female_indicator_se         = map_dbl(female_model_tidy, pull_indicator_se)
+    ) %>% 
+  select(indicator_id, male_indicator_coeff:female_indicator_se) %>% 
+  left_join(wb_data %>% select(indicator_id = indicatorID, indicator) %>% distinct) %>%
+  mutate(
+    male_t = male_indicator_coeff / male_indicator_se, 
+    female_t = female_indicator_coeff / female_indicator_se
+    ) %>% 
+  select(indicator_id, indicator, male_t, female_t) %>% 
+  arrange(desc(abs(male_t))) %>%
+  mutate(
+    male_rank = 1 + length(male_t) - rank(abs(male_t)), 
+    female_rank = 1 + length(female_t) - rank(abs(female_t))) %>% 
+  filter(abs(male_t) > 2 | abs(female_t) > 2) %>%
+  mutate(male_t = round(male_t, 2), female_t = round(female_t, 2)) %>% 
+  mutate(diff = male_rank - female_rank) %>% 
+  knitr::kable(caption = "Signal strength of indicators on male and female age-standardised all-cause DALY rate trends")
+
+
+
+
+```
+
+For DALY rate trends, the signal strength of school enrollment gender parity is stronger for females than that of GDP per capita. 
+
+Now, finally, to look at DALY rates related to NCDs
+
+
+```{r, results = "asis"}
+
+daly_rate_data_joined %>% 
+  filter(cause == "Non-communicable diseases") %>% 
+  select(country, year, sex, std_mort_rate, indicator_id, indicator, indicator_value) %>% 
+  filter(!is.na(indicator_value)) %>% 
+  group_by(indicator_id) %>% 
+  nest() %>% 
+  mutate(male_model = map(
+    data,
+    function(x) {
+      x %>%
+      filter(sex == "Male") %>%
+      lm(std_mort_rate ~ year + indicator_value, data = .) 
+    }
+      )
+    ) %>%
+  mutate(female_model = map(
+    data, 
+    function(x) {
+      x %>% 
+        filter(sex == "Female") %>% 
+        lm(std_mort_rate ~ year + indicator_value, data = .) 
+        }
+      )
+    ) %>% 
+  mutate(
+    male_model_tidy = map(male_model, broom::tidy),
+    female_model_tidy = map(female_model, broom::tidy)     
+  ) %>% 
+  mutate(
+    male_indicator_coeff        = map_dbl(male_model_tidy,   pull_indicator_coeff),
+    female_indicator_coeff      = map_dbl(female_model_tidy, pull_indicator_coeff),
+    male_indicator_se           = map_dbl(male_model_tidy,   pull_indicator_se),
+    female_indicator_se         = map_dbl(female_model_tidy, pull_indicator_se)
+    ) %>% 
+  select(indicator_id, male_indicator_coeff:female_indicator_se) %>% 
+  left_join(wb_data %>% select(indicator_id = indicatorID, indicator) %>% distinct) %>%
+  mutate(
+    male_t = male_indicator_coeff / male_indicator_se, 
+    female_t = female_indicator_coeff / female_indicator_se
+    ) %>% 
+  select(indicator_id, indicator, male_t, female_t) %>% 
+  arrange(desc(abs(male_t))) %>%
+  mutate(
+    male_rank = 1 + length(male_t) - rank(abs(male_t)), 
+    female_rank = 1 + length(female_t) - rank(abs(female_t))) %>% 
+  filter(abs(male_t) > 2 | abs(female_t) > 2) %>%
+  mutate(male_t = round(male_t, 2), female_t = round(female_t, 2)) %>% 
+  mutate(diff = male_rank - female_rank) %>% 
+  knitr::kable(caption = "Signal strength of indicators on male and female age-standardised NCD DALY rate trends")
+
+
+
+
+```
 
