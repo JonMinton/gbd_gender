@@ -1,9 +1,10 @@
 ---
 title: 'Exposure and Fixed-Effects modelling '
 output:
+  html_document: default
   word_document: default
   html_notebook: default
-  html_document: default
+self_contained: no
 ---
 
 # Introduction
@@ -58,7 +59,7 @@ download_completed_request("http://s3.healthdata.org/gbd-api-2016-production/67c
 
 ```
 
-```{r, eval = F}
+```{r}
 asr_dta <- read_csv("data/age_standardised_allcause_ncd/1.csv")
 ```
 
@@ -406,7 +407,7 @@ produce_diff_table <- function(DTA, this_cause, this_caption){
 
 ```
 
-```{r}
+```{r, results = 'asis'}
 diffs_mort_joined %>% 
   produce_diff_table(
     this_cause = "All causes", 
@@ -417,7 +418,7 @@ diffs_mort_joined %>%
 
 
 
-```{r}
+```{r, results = 'asis'}
 diffs_mort_joined %>% 
   produce_diff_table(
     this_cause = "Non-communicable diseases", 
@@ -427,7 +428,7 @@ diffs_mort_joined %>%
 ```
 
 
-```{r}
+```{r, results = 'asis'}
 diffs_daly_joined %>% 
   produce_diff_table(
     this_cause = "All causes", 
@@ -436,7 +437,7 @@ diffs_daly_joined %>%
 
 ```
 
-```{r}
+```{r, results = 'asis'}
 diffs_daly_joined %>% 
   produce_diff_table(
     this_cause = "Non-communicable diseases", 
@@ -461,13 +462,13 @@ mod_simple <- tmp_dta %>%
 # plot(model_01)
 # text(model_01, cex = 0.8, use.n = T, xpd = T)
 
-rpart.plot::prp(mod_simple, faclen = 0, cex = 0.8)
+rpart.plot::prp(mod_simple, faclen = 0, cex = 0.8, varlen = 0, extra = 2, under = T)
 
 mod_full <- tmp_dta %>% 
   select(-location) %>% 
   rpart::rpart(quint_rel ~ ., data = ., method = "class")
 
-rpart.plot::prp(mod_full, faclen = 0, cex = 0.8)
+rpart.plot::prp(mod_full, faclen = 0, cex = 0.8, varlen = 0, extra = 2, under = T)
 
 
 ```
@@ -493,5 +494,52 @@ So, the above model seems to be suggesting:
 * If GDP per cap > $13k, >= 38% of males in urban areas, high gender parity in tertiary school enrolment, but female:male youth unemployment >= 110 -> 5th quintile
 * Otherwise 4th quintile
 
+Now the same for NCDs
 
+
+```{r}
+tmp_dta <- diffs_mort_joined %>% 
+  filter(cause == "Non-communicable diseases") %>% 
+  mutate(quint_rel = cut(rel, breaks = quantile(rel, seq(0, 1, by = 0.2)), labels = F) %>% as.factor() ) %>% 
+  select(location,  year, cause, quint_rel, indicator_id, indicator_value) %>% 
+  spread(indicator_id, indicator_value) 
+
+mod_simple <- tmp_dta %>% 
+  rpart::rpart(quint_rel ~ year + NY.GDP.PCAP.PP.CD, data = ., method = "class")
+
+# plot(model_01)
+# text(model_01, cex = 0.8, use.n = T, xpd = T)
+
+rpart.plot::prp(mod_simple, faclen = 0, cex = 0.8, varlen = 0, extra = 2, under = T)
+
+mod_full <- tmp_dta %>% 
+  select(-location) %>% 
+  rpart::rpart(quint_rel ~ ., data = ., method = "class")
+
+rpart.plot::prp(mod_full, faclen = 0, cex = 0.8, varlen = 0, extra = 2, under = T)
+
+
+```
+
+
+But what are these thresholds?
+
+```{r}
+diffs_mort_joined %>% 
+  filter(cause == "All causes") %>% 
+  pull(rel) %>% 
+  quantile(seq(0, 1, by = 0.2)) -> tmp1
+
+diffs_mort_joined %>% 
+  filter(cause == "Non-communicable diseases") %>% 
+  pull(rel) %>% 
+  quantile(seq(0, 1, by = 0.2)) -> tmp2
+
+tab <- rbind(tmp1, tmp2); rm(tmp1, tmp2)
+row.names(tab) <- c("All causes", "NCDs")
+
+tab
+
+
+```
 
