@@ -1,10 +1,6 @@
 ---
 title: 'Exposure and Fixed-Effects modelling '
-output:
-  html_document: default
-  word_document: default
-  html_notebook: default
-self_contained: no
+output: html_notebook
 ---
 
 # Introduction
